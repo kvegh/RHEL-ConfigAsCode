@@ -73,3 +73,7 @@ inside encrypted host data. No plaintext recovery, account-policy expansion,
 scanner, apply operation or live host change is introduced. The independent
 optional-module policy remains unanswered. Version stays 0.0.1 because these
 are documentation and inactive template comments only.
+
+Template/documentation commit: `09770eb`. YAML parsing, empty desired-section
+maps, original comment ordering, generic placeholders and whitespace checks
+passed. These are static checks only; no executable functionality is claimed.
