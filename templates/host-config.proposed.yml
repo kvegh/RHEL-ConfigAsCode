@@ -1,115 +1,38 @@
 ---
 # DESIGN PROPOSAL ONLY: no executable playbook consumes this schema yet.
-# Copy and extend only after schema agreement. Never fill host data in this repo.
-# Filled copies belong only as whole-file Vault ciphertext in the private companion.
+# Filled host data belongs only as whole-file Vault ciphertext in the companion.
+# Define desired sections to apply them; omit sections to leave them unchanged.
+# Comments catalogue the available sections without selecting any of them.
 rhel_cac:
   schema_version: 1
+  sections: {}
+  # accounts:
+  # privilege:
+  # packages:
+  # ssh:
+  # firewall:
+  # kernel_settings:
+  # mounts:
+  # selinux:
+  # network:
+  # storage:
+  # registration_and_repositories:
+  # identity:
+  # time_synchronization:
+  # authentication_policy:
+  # services_and_schedules:
+  # logs_and_audit:
+  # certificates_and_trust:
+  # security_policy:
+  # boot_and_recovery:
+  # operating_defaults:
+  # specialized_os_facilities:
+
+# Metadata reports capture status; it never selects an apply module.
+scan_metadata:
   source_identity: null
   rhel_release: null
   architecture: null
-  sections:
-    accounts:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    privilege:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    packages:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    ssh:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    firewall:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    kernel_settings:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    mounts:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    selinux:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    network:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    storage:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    registration_and_repositories:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    identity:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    time_synchronization:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    authentication_policy:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    services_and_schedules:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    logs_and_audit:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    certificates_and_trust:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    security_policy:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    boot_and_recovery:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    operating_defaults:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
-    specialized_os_facilities:
-      managed: false
-      scan_status: not_scanned
-      values: {}
-      requires_input: []
+  sections: {}
+  # Per captured section, record completeness and any required protected inputs.
+  # Distinguish captured, not configured, inaccessible, unsupported and not scanned.

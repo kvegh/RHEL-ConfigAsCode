@@ -26,6 +26,49 @@ The effective configuration must be validated before host changes begin;
 required fields must be supplied, not guessed from another host's identity.
 Credentials stay in protected inputs, including when supplied as overrides.
 
+## CaC presence semantics
+
+The existing AAP importer calls CoP's `infra.aap_configuration.dispatch`, whose
+role selection checks whether each configuration variable is defined. Individual
+resource roles then process their supplied entries. This is a section-level
+pattern; role defaults and enforce-default options can still affect omitted fields.
+
+Use that presence-based style for this project's proposal:
+
+- An omitted optional section is skipped and its existing state is preserved.
+- A defined section with valid settings is applied; external settings override
+  corresponding saved settings. Do not add a separate managed/enabled flag.
+- An empty list supplies no items. A section without valid settings must not
+  trigger a System Role whose defaults would change unrelated configuration.
+- Deletion requires an explicit supported removal instruction, such as an item's
+  `state: absent`. Missing sections, entries or failed reads are not deletion.
+- New-host deployment validates the agreed mandatory sections first and fails
+  clearly if required inputs are absent. Partial configuration may omit them.
+
+Check field behavior for each selected System Role rather than assuming that
+undefined fields are universally ignored. Preserve meaningful `false` and zero
+values when mapping inputs.
+
+## DNF configuration data
+
+The owner accepted the fuller DNF scope as CaC entries. Represent only declared
+settings; omitted settings are left unchanged. Keep package installation entries
+and their exact/present/latest policy separate from these package-manager settings.
+
+| Area | Data to capture and apply when defined |
+|---|---|
+| Repositories | IDs, definitions, base URL/mirror list/metalink, enabled state and applicable access/proxy settings |
+| Trust | GPG keys, package/metadata signature-check policy, TLS verification and applicable CA/client-certificate references |
+| Release selection | Subscription/repository release lock and explicitly enabled module streams |
+| Package constraints | Exclusions, inclusion filters where used, and explicit version-lock entries |
+| Dependency behavior | Weak-dependency installation and applicable existing DNF dependency settings |
+
+Capture existing values without imposing stricter or looser defaults. Protected
+repository credentials and private key material belong only in encrypted or
+protected inputs. A scan cannot infer whether an observed package version was
+an intentional pin. In a new-host deployment, validate that declared repositories
+can supply the requested packages; no automatic repository or trust bypass is implied.
+
 ## Proposed smallest mandatory set
 
 This set is for owner discussion, not selected or implemented behavior.
@@ -60,8 +103,9 @@ automatic registration side effect.
 
 ## Proposed value handling and portability
 
-The illustrative template uses one section for each configuration area. Each
-section has managed status, capture completeness, values and required inputs.
+The illustrative template lists available sections as comments and starts with
+no desired sections defined. Capture completeness and required external inputs
+belong in separate scan metadata; they must not accidentally select a module.
 The exact schema and field contracts remain proposals.
 
 The simplest proposed override rule is recursive replacement of explicitly

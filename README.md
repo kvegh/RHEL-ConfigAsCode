@@ -104,11 +104,14 @@ small subsystem-specific reader for a concrete gap.
 Alternatively, begin with a clean template and supply all required deployment
 inputs externally or populate CaC first. A previous scan is not required.
 
-The illustrative [proposed template](templates/host-config.proposed.yml) makes
-unmanaged sections and incomplete reads explicit. Its schema is not selected
+The illustrative [proposed template](templates/host-config.proposed.yml) uses
+sparse desired configuration: define a section to apply it, and omit it to
+leave that area unchanged. There is no additional managed flag. Keep scan
+completeness separate from desired values. The exact field schema is not selected
 and no executable code consumes it yet. Empty or failed reads must never imply
 permission to delete configuration. Updating the generic template must preserve
-previously filled host values.
+previously filled host values. New-host deployment must reject missing mandatory
+inputs before changing the host; partial configuration may skip omitted modules.
 
 ## Capture limits
 

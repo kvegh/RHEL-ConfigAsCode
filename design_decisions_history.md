@@ -35,4 +35,10 @@ agreement. No alternate platform support or executable deployment is implied.
 The owner subsequently accepted logging, authentication including AD integration,
 services and certificates. The DNF discussion distinguishes repository/update
 policy from each package's exact/present/latest setting; no new defaults are selected.
-The scope documentation commit ID will be recorded after it is created.
+Scope documentation commit: `ca6371c`. Later discussion accepts fuller DNF
+settings as CaC data and asks for the existing CoP presence-based style.
+The template proposal therefore supersedes its initial managed flags with
+defined/apply and undefined/skip semantics and separate scan metadata. This does
+not establish universal field omission behavior for every System Role.
+Mandatory new-host inputs must be validated rather than silently skipped.
+The corresponding follow-up commit ID will be recorded after it is created.
