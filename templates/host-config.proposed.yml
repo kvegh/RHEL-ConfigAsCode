@@ -1,0 +1,104 @@
+---
+# DESIGN PROPOSAL ONLY: no executable playbook consumes this schema yet.
+# Copy and extend only after schema agreement. Never fill host data in this repo.
+# Filled copies belong only as whole-file Vault ciphertext in the private companion.
+rhel_cac:
+  schema_version: 1
+  source_identity: null
+  rhel_release: null
+  sections:
+    accounts:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    privilege:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    packages:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    ssh:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    firewall:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    kernel_settings:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    mounts:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    selinux:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    network:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    storage:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    registration_and_repositories:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    identity_and_time:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    authentication_policy:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    services_and_schedules:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    logs_and_audit:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    trust_and_security:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    boot_and_recovery:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    operating_defaults:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    specialized_os_facilities:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []

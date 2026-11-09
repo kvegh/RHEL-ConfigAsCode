@@ -1,0 +1,7 @@
+# Actual host configuration belongs in the private companion, never here.
+/captures/
+/private/
+*.vault.yml
+.ansible/
+*.retry
+__pycache__/
