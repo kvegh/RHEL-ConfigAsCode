@@ -46,3 +46,15 @@ Corresponding follow-up commit: `37ac7a9`. Static validation confirms a sparse
 desired-section map, separate scan metadata and 21 commented catalogue areas;
 no apply module is selected by the generic template. These remain design/data
 checks, not verification of executable capture or apply behavior.
+
+## 2026-11-09 — Record the selected external encryption password file
+
+Documentation commit: `a9d50c9`. The owner selected an existing protected
+Ansible Vault password file, resolving the encryption-input question. Its actual
+name, path and contents stay outside both repositories. Metadata-only checks
+confirmed that the file exists, is readable and has mode600; no contents were read.
+
+This corrects the earlier unresolved-source wording. It does not implement or
+verify encryption, scanning or applying configuration. Module policy remains
+an independent unanswered decision; optional-only behavior is a recommendation.
+No real host configuration, credential or new runtime mechanism was added.
