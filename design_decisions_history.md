@@ -15,4 +15,8 @@ are excluded. The initial section schema and added areas are proposals, not
 selected architecture or implemented scanning/applying. Supported releases,
 target portability and the Vault credential source remain unresolved.
 
-The initialization commit ID will be recorded after that commit is created.
+Initialization commit: `e780302`. It contains documentation and the explicitly
+proposed generic template only. YAML parsing and unmanaged/unscanned defaults
+passed static validation; independent scope review found no concrete issue.
+Executable scan/apply behavior, certified artifact contents and live tests
+remain unverified.
