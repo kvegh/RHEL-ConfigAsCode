@@ -49,6 +49,39 @@ Check field behavior for each selected System Role rather than assuming that
 undefined fields are universally ignored. Preserve meaningful `false` and zero
 values when mapping inputs.
 
+## Incremental template work
+
+Build the template in the owner's original order: root password; users, homes,
+groups and user passwords; sudo; packages; sshd; firewall; kernel parameters;
+mounts, targets and options; SELinux; network and all interfaces; storage
+including mirrors/LVM; subscription; enabled repositories; Insights.
+Then cover the subsequently accepted logging, authentication, services and
+certificate areas. Account for the remaining System Roles catalogue when the
+relevant area is discussed. Catalogue inclusion does not activate a subsystem.
+
+Clarify the supported scope of each module before accepting its fields. Do not
+expand later sections into every possible operating-system setting in advance.
+The numbered template comments record discussion order, not execution order.
+
+### First module: root password (proposal awaiting agreement)
+
+The proposed `root_password.password_hash` field represents an existing usable
+local root password hash or an explicitly supplied replacement hash. A future
+scanner would capture the existing hash when readable; the apply operation would
+set the selected hash. External input must override the saved value, as required
+for every module. This proposal does not add plaintext password handling.
+
+Omitting the section preserves the current password. Unreadable, locked or unset
+password state must be reported for clarification, never converted to an invented
+hash or an instruction to unlock the account. Actual hashes belong only inside
+the whole-file Vault-encrypted host configuration, using the already selected
+external encryption password file.
+
+Keep aging/expiry, account lock/unlock policy and SSH root-login policy out of
+this first field proposal; discuss them with their relevant module. The owner
+has not yet approved hash capture/replay or this field contract. No reader,
+password-changing task or live operation is implemented by these comments.
+
 ## DNF configuration data
 
 The owner accepted the fuller DNF scope as CaC entries. Represent only declared

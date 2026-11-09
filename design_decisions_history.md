@@ -58,3 +58,18 @@ This corrects the earlier unresolved-source wording. It does not implement or
 verify encryption, scanning or applying configuration. Module policy remains
 an independent unanswered decision; optional-only behavior is a recommendation.
 No real host configuration, credential or new runtime mechanism was added.
+
+## 2026-11-09 — Start defining the template one module at a time
+
+The owner requested building the template in the original brainstorming order,
+clarifying a bounded scope for each module before expanding it. The comments
+now begin with root password and preserve the original sequence through
+subscription, repositories and Insights. Discussion order does not prescribe
+execution order. Later catalogue areas remain unexpanded.
+
+The first proposal contains one root-password hash field, with capture/replay
+versus supplied-only behavior awaiting the owner's choice. Real hashes remain
+inside encrypted host data. No plaintext recovery, account-policy expansion,
+scanner, apply operation or live host change is introduced. The independent
+optional-module policy remains unanswered. Version stays 0.0.1 because these
+are documentation and inactive template comments only.

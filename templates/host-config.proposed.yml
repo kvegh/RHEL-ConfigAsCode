@@ -6,17 +6,39 @@
 rhel_cac:
   schema_version: 1
   sections: {}
+  # 01. Root password -- scope proposal awaiting owner agreement.
+  # root_password:
+  #   password_hash: "<existing or replacement password hash>"
+  # Capture a usable existing hash; never attempt plaintext password recovery.
+  # Store real hashes only inside the whole-file Vault-encrypted host config.
+  # Omit this section to preserve the target's current root password.
+  # Locked/unset passwords require clarification; do not invent a usable hash.
+  # Later sections follow the owner's original brainstorming order.
+  # 02. Users, home directories, groups and user passwords.
   # accounts:
+  # 03. Sudo users and rules.
   # privilege:
+  # 04. Packages: exact version, present or latest.
   # packages:
+  # 05. SSH server configuration.
   # ssh:
+  # 06. Firewall.
   # firewall:
+  # 07. Kernel parameters.
   # kernel_settings:
+  # 08. Device mounts, targets and options.
   # mounts:
+  # 09. SELinux.
   # selinux:
+  # 10. Network setup and all interfaces.
   # network:
+  # 11. Storage, including mirrors and LVM.
   # storage:
+  # 12-14. Subscription, enabled repositories/DNF policy, then Insights.
+  # Their grouping will be discussed when we reach them.
   # registration_and_repositories:
+  # Subsequently accepted areas: logging, authentication, services, certificates.
+  # Remaining catalogue entries stay unexpanded until their scope is discussed.
   # identity:
   # time_synchronization:
   # authentication_policy:

@@ -16,6 +16,12 @@ and proposes configuration sections and an extensible capture template. There
 are no executable scan or apply playbooks yet. No host has been scanned or
 configured, and no runtime or certified-collection compatibility is claimed.
 
+Template work now proceeds one module at a time in the owner's original
+brainstorming order, starting with root password. The first commented field
+proposal and its boundaries are in [module scope](docs/modules.md#incremental-template-work).
+Scope and fields are discussed before each module is accepted; later sections
+remain catalogue comments.
+
 This public repository holds reusable playbooks, generic templates and documentation.
 Actual host configuration belongs only as whole-file Ansible Vault ciphertext
 in the separate private `RHEL-ConfigAsCode-secrets` repository. Vault credentials
