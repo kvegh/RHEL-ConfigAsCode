@@ -41,4 +41,7 @@ The template proposal therefore supersedes its initial managed flags with
 defined/apply and undefined/skip semantics and separate scan metadata. This does
 not establish universal field omission behavior for every System Role.
 Mandatory new-host inputs must be validated rather than silently skipped.
-The corresponding follow-up commit ID will be recorded after it is created.
+Corresponding follow-up commit: `37ac7a9`. Static validation confirms a sparse
+desired-section map, separate scan metadata and 21 commented catalogue areas;
+no apply module is selected by the generic template. These remain design/data
+checks, not verification of executable capture or apply behavior.
