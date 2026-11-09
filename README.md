@@ -4,6 +4,11 @@ Configuration as code for the RHEL operating system after first login, assuming
 working Ansible access. Application stacks, OS installation and hypervisor
 provisioning are outside this project's current scope.
 
+The initial target is **RHEL 9 on x86_64 only**. RHEL 10 is later work. RHEL 8
+support is optional future scope contingent on separate funding and approval;
+neither it nor other architectures belong in the first implementation. Check
+the selected RHEL 9 minor release before using version-specific role features.
+
 ## Status
 
 Version **0.0.1** initializes the repository, records the owner's requirements,
@@ -25,14 +30,23 @@ stay outside Git. The private companion is not an umbrella submodule.
   a copy, fills observable configuration and produces encrypted host data.
 - Provide a read-only scanner and a separate operation to apply reviewed saved
   configuration to an explicitly selected RHEL host.
+- Build independent modules. Every module accepts external variables that
+  override saved CaC values, so one saved configuration can seed similar hosts.
+- Support configuring an already-running new host without a prior scan, using
+  complete externally supplied values or a configuration populated in advance.
+  Here, deploy means configure RHEL; it does not mean install the operating system.
+- Define a minimal mandatory module set for that deployment path. The concrete
+  set is proposed in [module contracts](docs/modules.md) and needs agreement.
+- Include logging, authentication (including AD integration), OS services and
+  certificate configuration, as subsequently accepted by the owner.
 - Cover root/account passwords, local users/groups/homes, sudo, package policies,
   sshd, firewall, kernel settings, mounts, SELinux, all network interfaces,
   storage including mirrors/LVM, subscriptions, repositories and Insights.
 
 ## Configuration sections for discussion
 
-The first eleven rows organize the owner's requested coverage. Later rows are
-proposed additions answering the question about major missing OS configuration.
+Rows without a proposed label organize requested or subsequently accepted
+coverage. Proposed rows answer the question about major missing OS configuration.
 The grouping and field schema remain proposals until agreed; they are not a
 claim of implemented support. Specific role coverage is in
 [the System Roles catalogue](docs/system-roles.md).
@@ -50,14 +64,22 @@ claim of implemented support. Specific role coverage is in
 | Network | All interfaces and persistent profiles, addresses, DHCP intent, DNS, routes/rules, bonds, bridges, VLANs and MTU |
 | Storage | Persistent device identity, partitions, filesystems, LVM, mirrors/RAID, swap and encryption where used |
 | Registration and software sources | Subscription/Satellite state, release lock, repository definitions and enabled state, GPG trust, DNF settings, exclusions/version locks/module streams, Insights settings |
-| Proposed: identity and time | Hostname, hosts file, timezone, locale/keymap, NTP/PTP |
-| Proposed: authentication policy | PAM/authselect, NSS/SSSD and directory membership configuration, password/lockout policy |
-| Proposed: services and schedules | Enabled/disabled/masked systemd units, overrides, timers and cron |
-| Proposed: logs and audit | journald, rsyslog destinations, rotation/retention, audit rules and optional session recording |
-| Proposed: trust and security policy | CA trust, certificate configuration, crypto policy, FIPS state, optional AIDE/fapolicyd |
+| Proposed: host identity | Hostname, hosts file, timezone, locale/keymap |
+| Proposed: time synchronization | NTP/PTP configuration |
+| Authentication | PAM/authselect, NSS/SSSD and AD/directory membership configuration, password/lockout policy |
+| Services | Enabled/disabled/masked systemd units and overrides; timers and cron are proposed scheduling coverage |
+| Logging | journald, rsyslog destinations and rotation/retention; audit rules and session recording are proposed extensions |
+| Certificates and trust | Host certificate configuration, CA trust and protected references to required key/issuance inputs |
+| Proposed: additional security policy | Crypto policy, FIPS state and optional AIDE/fapolicyd |
 | Proposed: boot and recovery | Bootloader/default kernel, command line, modules/blacklists, initramfs requirements and kdump |
 | Proposed: operating defaults | Limits, umask, tuning, login defaults/banners and selected OS configuration files |
 | Proposed: specialized OS facilities | NBDE, quotas, udev/multipath, clustering/GFS2 and attestation only where explicitly needed |
+
+Fuller DNF policy means repository definitions/access and GPG/TLS verification,
+release locks and module streams, exclusions/version locks and dependency policy
+such as weak dependencies. It is separate from each package's exact/present/latest
+policy. Capture existing settings first; do not silently impose new package policy.
+See the [RHEL 9 DNF guide](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/managing_software_with_the_dnf_tool/index).
 
 ## Scan and apply proposal
 
@@ -74,8 +96,13 @@ small subsystem-specific reader for a concrete gap.
    secrets, retain plaintext host-data files or cache secret facts.
 4. Review captured settings and choose actual desired policies. A scan does not
    know whether a package should remain pinned, present or track latest.
-5. Apply only reviewed, explicitly managed sections to the chosen target, then
+5. Resolve external per-module overrides over the saved values and validate the
+   effective target configuration. Omitted values retain their saved meaning.
+6. Apply only reviewed, explicitly managed sections to the chosen target, then
    verify the resulting configuration and a repeated apply.
+
+Alternatively, begin with a clean template and supply all required deployment
+inputs externally or populate CaC first. A previous scan is not required.
 
 The illustrative [proposed template](templates/host-config.proposed.yml) makes
 unmanaged sections and incomplete reads explicit. Its schema is not selected
@@ -99,8 +126,9 @@ previously filled host values.
 
 ## Decisions required before executable implementation
 
-The current questions concern supported RHEL releases, same-host versus
-different-host restoration, and the protected Vault credential source. Password
+Initial support is RHEL 9/x86_64 and includes configuring new hosts from saved
+or entirely new input. The protected Vault credential source and the concrete
+minimum module set remain open. Password
 hash capture, destructive storage changes and host-identity reuse also need
 explicit policies before their dependent behavior is implemented. New section
 proposals do not authorize activating services or applying security baselines.

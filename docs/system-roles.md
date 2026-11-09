@@ -8,6 +8,8 @@ include internal helper roles. Exact certified artifact contents, dependency
 requirements and release support must be verified before pinning a runtime.
 
 This is a catalogue for design, not a requirements manifest or installation.
+Initial execution support is restricted to RHEL 9 on x86_64; catalogue coverage
+does not promise that every role works on every RHEL 9 minor release.
 The [Red Hat support matrix](https://access.redhat.com/articles/3050101) and
 [RHEL 9 System Roles guide](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/automating_system_administration_by_using_rhel_system_roles/index)
 are primary references. The support overview is dated 2025 and omits newer

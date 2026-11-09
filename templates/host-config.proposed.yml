@@ -6,6 +6,7 @@ rhel_cac:
   schema_version: 1
   source_identity: null
   rhel_release: null
+  architecture: null
   sections:
     accounts:
       managed: false
@@ -62,7 +63,12 @@ rhel_cac:
       scan_status: not_scanned
       values: {}
       requires_input: []
-    identity_and_time:
+    identity:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    time_synchronization:
       managed: false
       scan_status: not_scanned
       values: {}
@@ -82,7 +88,12 @@ rhel_cac:
       scan_status: not_scanned
       values: {}
       requires_input: []
-    trust_and_security:
+    certificates_and_trust:
+      managed: false
+      scan_status: not_scanned
+      values: {}
+      requires_input: []
+    security_policy:
       managed: false
       scan_status: not_scanned
       values: {}
