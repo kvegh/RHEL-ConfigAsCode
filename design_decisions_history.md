@@ -14,7 +14,8 @@ configuration, using RHEL System Roles where applicable. Application stacks
 are excluded. The initial section schema and added areas are proposals, not
 selected architecture or implemented scanning/applying. Later owner replies
 selected RHEL 9/x86_64 first and new-host configuration with modular external
-overrides. The Vault credential source remains unresolved.
+overrides. The Vault credential source was unresolved at initialization and
+was subsequently selected as an existing protected external password file.
 
 Initialization commit: `e780302`. It contains documentation and the explicitly
 proposed generic template only. YAML parsing and unmanaged/unscanned defaults

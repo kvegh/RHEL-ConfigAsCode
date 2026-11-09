@@ -19,7 +19,10 @@ configured, and no runtime or certified-collection compatibility is claimed.
 This public repository holds reusable playbooks, generic templates and documentation.
 Actual host configuration belongs only as whole-file Ansible Vault ciphertext
 in the separate private `RHEL-ConfigAsCode-secrets` repository. Vault credentials
-stay outside Git. The private companion is not an umbrella submodule.
+stay outside Git. The owner selected an existing protected Ansible Vault password
+file; supply its location through the protected execution environment. Its actual
+name, path and contents are not repository configuration. The private companion
+is not an umbrella submodule.
 
 ## Owner-approved requirements
 
@@ -130,8 +133,11 @@ inputs before changing the host; partial configuration may skip omitted modules.
 ## Decisions required before executable implementation
 
 Initial support is RHEL 9/x86_64 and includes configuring new hosts from saved
-or entirely new input. The protected Vault credential source and the concrete
-minimum module set remain open. Password
+or entirely new input. The external Vault password file has been selected.
+Module policy remains open: no configuration area is inherently required on
+an already-running reachable host, so optional-only modules are the current
+recommendation; the earlier mandatory-core list remains an unapproved proposal.
+Password
 hash capture, destructive storage changes and host-identity reuse also need
 explicit policies before their dependent behavior is implemented. New section
 proposals do not authorize activating services or applying security baselines.
