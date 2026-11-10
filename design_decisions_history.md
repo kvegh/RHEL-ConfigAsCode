@@ -77,3 +77,37 @@ are documentation and inactive template comments only.
 Template/documentation commit: `09770eb`. YAML parsing, empty desired-section
 maps, original comment ordering, generic placeholders and whitespace checks
 passed. These are static checks only; no executable functionality is claimed.
+
+## 2026-11-10 — Implement the first deployment slice before its scanner
+
+The owner approved root hash capture from shadow, declared local accounts with
+fresh SSH keypairs saved in encrypted CaC, wheel passwordless sudo and disabled
+SSH password authentication with service restart. All modules are optional.
+The owner explicitly requires config_source to select default_config or
+stored_config, deployment code commits to be patch releases, and scanner code
+to follow completed deployment playbooks as minor releases. This deployment
+slice advances to 0.0.2; no scanner is included.
+
+The implementation uses ordinary Ansible task files, native account operations,
+certified POSIX authorized-key content and certified sudo/SSH System Roles.
+Dependencies are pinned to the existing verified artifacts: System Roles1.120.5
+and POSIX2.2.2, with combined core minimum2.16. No tool was installed or content
+vendored. Selected fields are validated before configuration tasks; external
+dictionary overrides recurse and lists replace. Default and stored maps stay
+separate. Private client keys never deploy to targets.
+
+Focused review corrected unrelated SSH host-key management, added effective
+per-user SSH connection checks and timestamp-independent sudo execution tests.
+SSH preserves unrelated configuration, requires existing UseDNS no for its
+IP-based management context, validates before restart and reconnects afterward.
+Other client contexts and arbitrary policy conversion remain outside this slice.
+
+Ten real Ansible encrypted-input tests passed, including source selection,
+overrides, optional sections, invalid inputs and absence of fixture secrets in
+output. Deployment and verifier syntax checks and offline production strict lint
+passed. These are development checks, not deployed functionality or formal review
+acceptance. Protected default preparation verified two distinct matching keypairs;
+source shadow access still needs existing sudo authentication. Test guests are
+being prepared separately. The owner permits local Ansible for development but
+requires AAP from the first functional test. AAP setup and actual deployment,
+verification, repeated apply and key-login tests remain pending.

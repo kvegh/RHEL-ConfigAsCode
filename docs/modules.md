@@ -1,163 +1,64 @@
-# Modular configuration and deployment inputs
+# Module scope
 
-## Approved behavior
+All modules are optional for new and existing running RHEL hosts. The owner
+confirmed this; the earlier mandatory-core proposal is superseded. Omit a module
+to preserve it. Validate selected fields before host changes. External dictionary
+fields override saved fields recursively; external lists replace saved lists.
 
-The owner requires independent modules, external overrides for every module,
-and configuring an already-running new RHEL host without a prior scan.
-Initial support is RHEL 9 on x86_64. This is an OS configuration project.
-The owner also expressly accepted logging, authentication (including AD),
-services and certificates as configuration areas. AD is a candidate for later
-functional testing; no directory target or join operation has been authorized.
+## First deployment slice
 
-A project module means a selectable configuration area. Use certified RHEL
-System Roles directly where they provide the capability, and suitable native
-Ansible tasks for concrete gaps. This does not require a custom Ansible module
-plugin, a new collection, a service or a wrapper around every System Role.
+The owner approved root hash only, then users/keys, wheel sudo and SSH. Keep
+this slice bounded: no general account lifecycle, full sudo grammar or arbitrary
+SSH-policy framework.
 
-Both input paths must work:
-
-1. Saved configuration supplies defaults; external variables override the
-   chosen fields for the target host.
-2. A clean configuration plus complete external variables, or CaC populated
-   in advance, supplies all required inputs for a new host.
-
-External values take precedence. A missing value does not mean deletion.
-The effective configuration must be validated before host changes begin;
-required fields must be supplied, not guessed from another host's identity.
-Credentials stay in protected inputs, including when supplied as overrides.
-
-## CaC presence semantics
-
-The existing AAP importer calls CoP's `infra.aap_configuration.dispatch`, whose
-role selection checks whether each configuration variable is defined. Individual
-resource roles then process their supplied entries. This is a section-level
-pattern; role defaults and enforce-default options can still affect omitted fields.
-
-Use that presence-based style for this project's proposal:
-
-- An omitted optional section is skipped and its existing state is preserved.
-- A defined section with valid settings is applied; external settings override
-  corresponding saved settings. Do not add a separate managed/enabled flag.
-- An empty list supplies no items. A section without valid settings must not
-  trigger a System Role whose defaults would change unrelated configuration.
-- Deletion requires an explicit supported removal instruction, such as an item's
-  `state: absent`. Missing sections, entries or failed reads are not deletion.
-- New-host deployment validates the agreed mandatory sections first and fails
-  clearly if required inputs are absent. Partial configuration may omit them.
-
-Check field behavior for each selected System Role rather than assuming that
-undefined fields are universally ignored. Preserve meaningful `false` and zero
-values when mapping inputs.
-
-## Incremental template work
-
-Build the template in the owner's original order: root password; users, homes,
-groups and user passwords; sudo; packages; sshd; firewall; kernel parameters;
-mounts, targets and options; SELinux; network and all interfaces; storage
-including mirrors/LVM; subscription; enabled repositories; Insights.
-Then cover the subsequently accepted logging, authentication, services and
-certificate areas. Account for the remaining System Roles catalogue when the
-relevant area is discussed. Catalogue inclusion does not activate a subsystem.
-
-Clarify the supported scope of each module before accepting its fields. Do not
-expand later sections into every possible operating-system setting in advance.
-The numbered template comments record discussion order, not execution order.
-
-### First module: root password (proposal awaiting agreement)
-
-The proposed `root_password.password_hash` field represents an existing usable
-local root password hash or an explicitly supplied replacement hash. A future
-scanner would capture the existing hash when readable; the apply operation would
-set the selected hash. External input must override the saved value, as required
-for every module. This proposal does not add plaintext password handling.
-
-Omitting the section preserves the current password. Unreadable, locked or unset
-password state must be reported for clarification, never converted to an invented
-hash or an instruction to unlock the account. Actual hashes belong only inside
-the whole-file Vault-encrypted host configuration, using the already selected
-external encryption password file.
-
-Keep aging/expiry, account lock/unlock policy and SSH root-login policy out of
-this first field proposal; discuss them with their relevant module. The owner
-has not yet approved hash capture/replay or this field contract. No reader,
-password-changing task or live operation is implemented by these comments.
-
-## DNF configuration data
-
-The owner accepted the fuller DNF scope as CaC entries. Represent only declared
-settings; omitted settings are left unchanged. Keep package installation entries
-and their exact/present/latest policy separate from these package-manager settings.
-
-| Area | Data to capture and apply when defined |
+| Section | Fields |
 |---|---|
-| Repositories | IDs, definitions, base URL/mirror list/metalink, enabled state and applicable access/proxy settings |
-| Trust | GPG keys, package/metadata signature-check policy, TLS verification and applicable CA/client-certificate references |
-| Release selection | Subscription/repository release lock and explicitly enabled module streams |
-| Package constraints | Exclusions, inclusion filters where used, and explicit version-lock entries |
-| Dependency behavior | Weak-dependency installation and applicable existing DNF dependency settings |
+| `root_password` | Required `password_hash`: usable SHA-512 or yescrypt hash without a lock marker |
+| `accounts` | List of `name`, optional absolute `home`/`shell`, required nonempty `ssh_public_keys`; optional `ssh_private_key` stays in encrypted CaC only |
+| `privilege` | `wheel_members` list and `wheel_nopasswd` boolean |
+| `ssh` | `password_authentication` boolean; controls both direct and keyboard-interactive passwords |
 
-Capture existing values without imposing stricter or looser defaults. Protected
-repository credentials and private key material belong only in encrypted or
-protected inputs. A scan cannot infer whether an observed package version was
-an intentional pin. In a new-host deployment, validate that declared repositories
-can supply the requested packages; no automatic repository or trust bypass is implied.
+Account entries add public keys and preserve unrelated keys. They do not deploy
+private keys, delete accounts, or manage user passwords/aging. Wheel membership
+is additive. A false NOPASSWD value sets PASSWD on the owned rule but does not
+remove independent privileges granted by somebody else's rules.
 
-## Proposed smallest mandatory set
+The sudo System Role owns `/etc/sudoers.d/90-rhel-cac`; SSH owns
+`/etc/ssh/sshd_config.d/00-rhel-cac.conf`. Validate combined configuration and
+effective settings; do not replace unrelated policy. Restart SSH after validation
+when changes notify its handler.
 
-This set is for owner discussion, not selected or implemented behavior.
-Mandatory means the deployment contract must account for the area; an explicit
-approved preserve-existing choice may be appropriate where no change is wanted.
+Required `config_source` chooses `default_config` or `stored_config`, both maps
+under `rhel_cac` in the selected encrypted `config_file`. Observations do not
+overwrite defaults. Empty maps select no modules. Missing protected inputs must
+remain omitted or fail validation, never turn into invented passwords.
 
-| Module | Required decision/input area |
-|---|---|
-| Host identity | Target hostname, hosts-file policy, locale/keymap and timezone |
-| Accounts and privilege | Root policy, administrative accounts/groups/homes, sudo and required access keys |
-| SSH | Server access policy and persistent sshd configuration |
-| Network | Management connectivity, interface/profile identity, addresses or DHCP intent, DNS and routes |
-| Registration and software sources | Subscription/Satellite/offline mode, repository definitions and enabled state, relevant DNF policy |
-| Packages | Explicit baseline packages and exact/present/latest policy |
-| Time synchronization | Selected NTP/PTP sources or an explicit preserve-existing choice |
+## Later discussion order
 
-Add the four accepted areas to the proposed base contract: authentication,
-logging, OS services and certificates/trust. Their required fields and whether
-an explicit preserve-existing choice is sufficient for a particular deployment
-still need agreement. Acceptance of an area does not enable every possible service.
+Original order: root password; users/homes/groups/passwords; sudo; packages;
+sshd; firewall; kernel parameters; mounts/targets/options; SELinux; network/all
+interfaces; storage/mirrors/LVM; subscription; repositories; Insights. The owner
+subsequently explicitly selected root/users/sudo/SSH as the first slice.
 
-Target identity, RHEL release/architecture, Ansible/become access, required inputs
-and supported section capabilities also need a preflight validation before apply.
-These checks are technical prerequisites, not extra deployable services.
+Logging, authentication/AD, OS services and certificates were also accepted as
+future areas. Account for every public RHEL System Role without activating every
+subsystem. Application stacks remain excluded.
 
-The remaining catalogue areas stay independent modules: storage, mounts,
-SELinux, firewall, kernel, audit/session recording, additional crypto policy,
-boot/kdump, schedules and specialized OS facilities.
-This minimum does not authorize changing their existing state or applying an
-unspecified hardening profile. Insights remains an explicit setting, not an
-automatic registration side effect.
+Accepted fuller DNF scope covers repository definitions/access/enabled state,
+GPG/TLS checks, release locks/module streams, exclusions/version locks, and
+dependency behavior such as weak dependencies. Keep it separate from per-package
+exact/present/latest. Its detailed contract is future work.
 
-## Proposed value handling and portability
+## Capture and release sequence
 
-The illustrative template lists available sections as comments and starts with
-no desired sections defined. Capture completeness and required external inputs
-belong in separate scan metadata; they must not accidentally select a module.
-The exact schema and field contracts remain proposals.
+Finish and commit deployment playbooks as patch releases before writing scanners.
+Then add corresponding scanners as minor releases. Capture only implemented
+sections and keep observed values separate from defaults and scan metadata.
 
-The simplest proposed override rule is recursive replacement of explicitly
-provided dictionary fields, with supplied lists replacing the saved list as a
-whole. Do not append disks, interfaces, accounts or firewall rules implicitly.
-Define explicit removal separately from absence. Finalize these semantics with
-the schema before implementation; no custom merge framework is selected.
+Privileged scans can read shadow hashes, not original plaintext passwords.
+Authorized public keys cannot recover private client keys; scanning private keys
+is outside this slice. Missing/inaccessible reads must not imply removal or unlock.
+Arbitrary custom sudo/SSH constructs remain outside this initial bounded scope.
 
-A scan preserves observed configuration and marks inaccessible, unsupported or
-unscanned sections. Desired policy and target-specific overrides are separate
-decisions. Reusing captured NIC/disk/SSH/subscription identities on a different
-host requires explicit target mapping or a deliberate regeneration policy.
-Storage creation, resizing, deletion and encryption changes must remain explicit;
-the fact that a new host is being configured does not authorize repartitioning it.
-
-## Verification required before delivery
-
-Exercise every module's override contract, absence versus explicit removal and
-incomplete-capture behavior. On an authorized disposable RHEL host, demonstrate
-scan/encrypt/apply/repeat and the no-prior-scan deployment path using supplied
-variables. Verify effective configuration and preservation of unrelated state.
-This initial documentation release performs none of those host operations.
+Scan-version retention and comparison is a separate owner-requested discussion
+tracked in Beads; no retention policy or comparison component is selected.

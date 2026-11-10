@@ -1,0 +1,31 @@
+---
+# Generic template: real configuration must be whole-file Vault encrypted.
+# Each file has independent default and scanned configuration sections.
+rhel_cac:
+  schema_version: 1
+  default_config: {}
+  stored_config: {}
+  # Under either source, define only the modules to apply:
+  # root_password:
+  #   password_hash: "<SHA-512 or yescrypt password hash>"
+  # accounts:
+  #   - name: "<local_account>"
+  #     home: "<absolute_home_path>"
+  #     shell: /bin/bash
+  #     ssh_public_keys:
+  #       - "<OpenSSH public key>"
+  #     ssh_private_key: |
+  #       <OpenSSH private key, kept only in encrypted CaC>
+  # privilege:
+  #   wheel_members: ["<local_account>"]
+  #   wheel_nopasswd: true
+  # ssh:
+  #   password_authentication: false
+
+# Scanner status never selects a deployment module.
+scan_metadata: {}
+
+# Later discussion order remains packages, firewall, kernel parameters, mounts,
+# SELinux, network/interfaces, storage/mirrors/LVM, subscription, repos/DNF,
+# Insights, then logging, authentication, services, certificates and other roles.
+# Those modules are not implemented and are rejected if selected in this release.

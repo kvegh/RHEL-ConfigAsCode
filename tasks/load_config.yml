@@ -1,0 +1,51 @@
+---
+- name: Require an explicit configuration source and encrypted file
+  ansible.builtin.assert:
+    that:
+      - config_source is defined
+      - config_source in ['default_config', 'stored_config']
+      - config_file is defined
+      - config_file is string
+      - config_file | length > 0
+      - rhel_cac_overrides | default({}) is mapping
+    fail_msg: Supply config_source (default_config or stored_config) and config_file.
+    quiet: true
+
+- name: Read ciphertext on the control node
+  ansible.builtin.slurp:
+    src: "{{ config_file }}"
+  delegate_to: localhost
+  become: false
+  register: rhel_cac_ciphertext
+
+- name: Require whole-file Vault encryption
+  ansible.builtin.assert:
+    that:
+      - (rhel_cac_ciphertext.content | b64decode).startswith('$ANSIBLE_VAULT;')
+    fail_msg: Actual configuration must be whole-file Ansible Vault ciphertext.
+    quiet: true
+
+- name: Load protected configuration without replacing launch variables
+  ansible.builtin.include_vars:
+    file: "{{ config_file }}"
+    name: rhel_cac_document
+
+- name: Validate document and selected source
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_document.rhel_cac is mapping
+      - rhel_cac_document.rhel_cac.schema_version == 1
+      - rhel_cac_document.rhel_cac[config_source] is defined
+      - rhel_cac_document.rhel_cac[config_source] is mapping
+    quiet: true
+
+# Explicit dictionary fields override saved fields; a supplied list replaces it.
+- name: Resolve saved configuration with external overrides
+  ansible.builtin.set_fact:
+    rhel_cac_effective: >-
+      {{ rhel_cac_document.rhel_cac[config_source]
+         | combine(rhel_cac_overrides | default({}), recursive=true, list_merge='replace') }}
+    cacheable: false
+
+- name: Validate all selected modules before host changes
+  ansible.builtin.import_tasks: validate_config.yml

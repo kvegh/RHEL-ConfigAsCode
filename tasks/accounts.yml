@@ -1,0 +1,19 @@
+---
+- name: Ensure declared local accounts exist
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    home: "{{ item.home | default(omit) }}"
+    shell: "{{ item.shell | default(omit) }}"
+    create_home: true
+    state: present
+  loop: "{{ rhel_cac_effective.accounts }}"
+
+# Private client keys stay in encrypted CaC; only public keys belong on targets.
+- name: Add declared authorized public keys while preserving unrelated keys
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_public_keys | join('\n') }}"
+    state: present
+    exclusive: false
+    manage_dir: true
+  loop: "{{ rhel_cac_effective.accounts }}"

@@ -1,0 +1,26 @@
+---
+- name: Read the declared account's actual local entry
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ rhel_cac_test_account.name }}"
+
+- name: Verify explicitly declared home and shell
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_test_account.home is not defined or ansible_facts.getent_passwd[rhel_cac_test_account.name][4] == rhel_cac_test_account.home
+      - rhel_cac_test_account.shell is not defined or ansible_facts.getent_passwd[rhel_cac_test_account.name][5] == rhel_cac_test_account.shell
+    quiet: true
+
+- name: Read authorized public keys from the account's actual home
+  ansible.builtin.slurp:
+    src: "{{ ansible_facts.getent_passwd[rhel_cac_test_account.name][4] }}/.ssh/authorized_keys"
+  register: rhel_cac_test_authorized_keys
+
+- name: Verify each declared public key is authorized
+  ansible.builtin.assert:
+    that:
+      - >-
+        (rhel_cac_test_authorized_keys.content | b64decode) is search(
+        '(?m)^' ~ (item.split()[0] | regex_escape) ~ ' ' ~ (item.split()[1] | regex_escape) ~ '(?: [^\r\n]*)?$')
+    quiet: true
+  loop: "{{ rhel_cac_test_account.ssh_public_keys }}"

@@ -1,0 +1,94 @@
+---
+# Read-only deployed-state checks; use the same encrypted inputs as deploy.yml.
+# This verifies host state, not a complete AAP workflow or client SSH login.
+- name: Verify the selected deployed RHEL configuration
+  hosts: rhel_cac_targets
+  gather_facts: false
+  become: true
+  no_log: true
+  any_errors_fatal: true
+  tasks:
+    - name: Load and validate expected configuration
+      ansible.builtin.import_tasks: ../tasks/load_config.yml
+
+    - name: Verify the supported platform and elevated access
+      ansible.builtin.import_tasks: ../tasks/preflight.yml
+
+    - name: Read the root shadow entry
+      ansible.builtin.getent:
+        database: shadow
+        key: root
+      when: rhel_cac_effective.root_password is defined
+
+    - name: Verify the declared root hash
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.getent_shadow.root[0] == rhel_cac_effective.root_password.password_hash
+        quiet: true
+      when: rhel_cac_effective.root_password is defined
+
+    - name: Verify each declared account and its authorized keys
+      ansible.builtin.include_tasks: verify_account.yml
+      loop: "{{ rhel_cac_effective.accounts | default([]) }}"
+      loop_control:
+        loop_var: rhel_cac_test_account
+
+    - name: Read declared wheel membership
+      ansible.builtin.command:
+        argv: [id, -nG, "{{ item }}"]
+      loop: "{{ (rhel_cac_effective.privilege | default({})).wheel_members | default([]) }}"
+      changed_when: false
+      check_mode: false
+      register: rhel_cac_test_groups
+
+    - name: Verify declared wheel membership
+      ansible.builtin.assert:
+        that: "'wheel' in item.stdout.split()"
+        quiet: true
+      loop: "{{ rhel_cac_test_groups.results }}"
+
+    - name: Read effective sudo privileges for declared members
+      ansible.builtin.command:
+        argv: [/usr/bin/sudo, -n, -l, -U, "{{ item }}"]
+      environment:
+        LC_ALL: C
+      loop: "{{ (rhel_cac_effective.privilege | default({})).wheel_members | default([]) }}"
+      changed_when: false
+      check_mode: false
+      register: rhel_cac_test_sudo
+
+    - name: Verify effective passwordless sudo privileges
+      ansible.builtin.assert:
+        that:
+          - item.stdout is search('(?m)^\s*\(ALL(?:\s*:\s*ALL)?\)\s+NOPASSWD:\s+ALL\s*$')
+        quiet: true
+      loop: "{{ rhel_cac_test_sudo.results }}"
+      when:
+        - rhel_cac_effective.privilege is defined
+        - rhel_cac_effective.privilege.wheel_nopasswd | bool
+
+    - name: Verify SSH policy for the actual management connection and users
+      ansible.builtin.import_tasks: ../tasks/verify_ssh.yml
+      when: rhel_cac_effective.ssh is defined
+
+    - name: Read SSH service state
+      ansible.builtin.service_facts:
+      when: rhel_cac_effective.ssh is defined
+
+    - name: Verify the SSH service is running
+      ansible.builtin.assert:
+        that: ansible_facts.services['sshd.service'].state == 'running'
+        quiet: true
+      when: rhel_cac_effective.ssh is defined
+
+    - name: Prove passwordless sudo execution for each declared member
+      ansible.builtin.command:
+        argv: [/usr/bin/sudo, -n, -k, /usr/bin/true]
+      become: true
+      become_user: "{{ item }}"
+      loop: "{{ (rhel_cac_effective.privilege | default({})).wheel_members | default([]) }}"
+      changed_when: false
+      check_mode: false
+      when:
+        - rhel_cac_effective.privilege is defined
+        - rhel_cac_effective.privilege.wheel_nopasswd | bool

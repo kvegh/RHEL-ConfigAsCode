@@ -1,0 +1,51 @@
+---
+- name: Apply selected RHEL operating system configuration
+  hosts: rhel_cac_targets
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  # Hashes and account/key configuration must not appear in job output or diffs.
+  no_log: true
+  tasks:
+    - name: Load and validate selected configuration
+      ansible.builtin.import_tasks: tasks/load_config.yml
+
+    - name: Verify target platform and elevated access
+      ansible.builtin.import_tasks: tasks/preflight.yml
+
+    - name: Apply root password hash
+      ansible.builtin.import_tasks: tasks/root_password.yml
+      when: rhel_cac_effective.root_password is defined
+
+    - name: Apply declared local accounts and authorized public keys
+      ansible.builtin.import_tasks: tasks/accounts.yml
+      when: rhel_cac_effective.accounts is defined
+
+    - name: Apply declared wheel membership and sudo policy
+      ansible.builtin.import_tasks: tasks/privilege.yml
+      when: rhel_cac_effective.privilege is defined
+
+    - name: Apply SSH password authentication policy
+      ansible.builtin.import_tasks: tasks/ssh.yml
+      when: rhel_cac_effective.ssh is defined
+
+    - name: Finish validated service changes
+      ansible.builtin.meta: flush_handlers
+
+    - name: Reconnect after selected SSH configuration
+      ansible.builtin.meta: reset_connection
+      when: rhel_cac_effective.ssh is defined
+
+    - name: Verify Ansible connectivity after the SSH change
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+      when:
+        - rhel_cac_effective.ssh is defined
+        - not ansible_check_mode
+
+  handlers:
+    - name: Restart validated SSH service
+      ansible.builtin.systemd_service:
+        name: sshd
+        state: restarted

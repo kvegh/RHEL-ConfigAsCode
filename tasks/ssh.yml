@@ -1,0 +1,22 @@
+---
+- name: Apply the owned SSH authentication drop-in using the certified System Role
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.sshd
+    apply:
+      no_log: true
+      notify: Restart validated SSH service
+  vars:
+    sshd_config_file: /etc/ssh/sshd_config.d/00-rhel-cac.conf
+    sshd_skip_defaults: true
+    sshd_backup: false
+    sshd_verify_hostkeys: []
+    sshd_manage_service: false
+    sshd_allow_reload: false
+    sshd_allow_restart: false
+    sshd_config:
+      PasswordAuthentication: "{{ rhel_cac_effective.ssh.password_authentication | ternary('yes', 'no') }}"
+      # PAM keyboard-interactive can also accept passwords; disable both paths.
+      KbdInteractiveAuthentication: "{{ rhel_cac_effective.ssh.password_authentication | ternary('yes', 'no') }}"
+
+- name: Verify combined and managed-user SSH policy before restart
+  ansible.builtin.import_tasks: verify_ssh.yml

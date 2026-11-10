@@ -1,0 +1,85 @@
+---
+- name: Reject configuration areas not implemented in this release
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_effective is mapping
+      - rhel_cac_effective.keys() | difference(['root_password', 'accounts', 'privilege', 'ssh']) | length == 0
+    quiet: true
+
+- name: Validate root password hash
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_effective.root_password is mapping
+      - rhel_cac_effective.root_password.keys() | difference(['password_hash']) | length == 0
+      - rhel_cac_effective.root_password.password_hash is string
+      - >-
+        rhel_cac_effective.root_password.password_hash is match(
+        '^(\$6\$(rounds=[0-9]+\$)?[./0-9A-Za-z]{1,16}\$[./0-9A-Za-z]{86}|'
+        ~ '\$y\$[./0-9A-Za-z]+\$[./0-9A-Za-z]+\$[./0-9A-Za-z]{43})$')
+    fail_msg: Root configuration requires a usable SHA-512 or yescrypt hash, without lock markers.
+    quiet: true
+  when: rhel_cac_effective.root_password is defined
+
+- name: Validate account list
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_effective.accounts is sequence
+      - rhel_cac_effective.accounts is not string
+      - rhel_cac_effective.accounts is not mapping
+      - rhel_cac_effective.accounts | map(attribute='name') | list | unique | length == rhel_cac_effective.accounts | length
+    quiet: true
+  when: rhel_cac_effective.accounts is defined
+
+- name: Validate each declared account
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.keys() | difference(['name', 'home', 'shell', 'ssh_public_keys', 'ssh_private_key']) | length == 0
+      - item.name is match('^[a-z_][a-z0-9_-]*[$]?$')
+      - item.name != 'root'
+      - item.home is not defined or (item.home is string and item.home is match('^/[^\r\n]+$'))
+      - item.shell is not defined or (item.shell is string and item.shell is match('^/[^\r\n]+$'))
+      - item.ssh_public_keys is sequence
+      - item.ssh_public_keys is not string
+      - item.ssh_public_keys is not mapping
+      - item.ssh_public_keys | length > 0
+    quiet: true
+  loop: "{{ rhel_cac_effective.accounts | default([]) }}"
+
+- name: Validate declared authorized public keys
+  ansible.builtin.assert:
+    that:
+      - item.1 is string
+      - >-
+        item.1 is match('^(ssh-rsa|ssh-ed25519|ecdsa-sha2-nistp(256|384|521)) [A-Za-z0-9+/=]+(?: [^\r\n]*)?$')
+    quiet: true
+  loop: "{{ rhel_cac_effective.accounts | default([]) | subelements('ssh_public_keys') }}"
+
+- name: Validate wheel policy
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_effective.privilege is mapping
+      - rhel_cac_effective.privilege.keys() | difference(['wheel_members', 'wheel_nopasswd']) | length == 0
+      - rhel_cac_effective.privilege.wheel_members is sequence
+      - rhel_cac_effective.privilege.wheel_members is not string
+      - rhel_cac_effective.privilege.wheel_members is not mapping
+      - rhel_cac_effective.privilege.wheel_nopasswd is boolean
+    quiet: true
+  when: rhel_cac_effective.privilege is defined
+
+- name: Validate wheel member names
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^[a-z_][a-z0-9_-]*[$]?$')
+    quiet: true
+  loop: "{{ (rhel_cac_effective.privilege | default({})).wheel_members | default([]) }}"
+
+- name: Validate SSH authentication policy
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_effective.ssh is mapping
+      - rhel_cac_effective.ssh.keys() | difference(['password_authentication']) | length == 0
+      - rhel_cac_effective.ssh.password_authentication is boolean
+    quiet: true
+  when: rhel_cac_effective.ssh is defined

@@ -1,0 +1,49 @@
+---
+- name: Read existing declared wheel member accounts
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ item }}"
+  loop: "{{ rhel_cac_effective.privilege.wheel_members }}"
+
+- name: Add declared accounts to wheel without removing other memberships
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: wheel
+    append: true
+  loop: "{{ rhel_cac_effective.privilege.wheel_members }}"
+
+- name: Read the primary sudo policy
+  ansible.builtin.slurp:
+    src: /etc/sudoers
+  register: rhel_cac_sudoers
+
+- name: Require the sudo drop-in directory to be included
+  ansible.builtin.assert:
+    that:
+      - (rhel_cac_sudoers.content | b64decode) is search('(?m)^\s*(#|@)includedir\s+/etc/sudoers.d\s*$')
+    fail_msg: The primary sudoers must include /etc/sudoers.d before applying this module.
+    quiet: true
+
+- name: Apply wheel sudo policy using the certified System Role
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.sudo
+    apply:
+      no_log: true
+  vars:
+    sudo_check_if_configured: false
+    sudo_rewrite_default_sudoers_file: false
+    sudo_remove_unauthorized_included_files: false
+    sudo_sudoers_files:
+      - path: /etc/sudoers.d/90-rhel-cac
+        user_specifications:
+          - users: ['%wheel']
+            hosts: [ALL]
+            operators: [ALL]
+            tags: "{{ rhel_cac_effective.privilege.wheel_nopasswd | ternary(['NOPASSWD'], ['PASSWD']) }}"
+            commands: [ALL]
+
+- name: Validate combined sudo configuration
+  ansible.builtin.command:
+    argv: [/usr/sbin/visudo, -c]
+  changed_when: false
+  check_mode: false

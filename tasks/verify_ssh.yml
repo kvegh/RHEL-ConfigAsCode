@@ -1,0 +1,78 @@
+---
+- name: Validate the complete SSH configuration
+  ansible.builtin.command:
+    argv: [/usr/sbin/sshd, -t]
+  changed_when: false
+  check_mode: false
+
+- name: Read effective global SSH authentication settings
+  ansible.builtin.command:
+    argv: [/usr/sbin/sshd, -T]
+  changed_when: false
+  check_mode: false
+  register: rhel_cac_sshd_effective
+
+- name: Require effective global SSH settings to match CaC
+  ansible.builtin.assert:
+    that:
+      - "('passwordauthentication ' ~ (rhel_cac_effective.ssh.password_authentication | ternary('yes', 'no'))) in rhel_cac_sshd_effective.stdout_lines"
+      - "('kbdinteractiveauthentication ' ~ (rhel_cac_effective.ssh.password_authentication | ternary('yes', 'no'))) in rhel_cac_sshd_effective.stdout_lines"
+      - "'usedns no' in rhel_cac_sshd_effective.stdout_lines"
+    fail_msg: Existing SSH policy conflicts with CaC; service was not restarted.
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Read the actual management login user
+  ansible.builtin.command:
+    argv: [id, -un]
+  become: false
+  changed_when: false
+  check_mode: false
+  register: rhel_cac_management_user
+
+- name: Identify users whose SSH connection policy must be checked
+  ansible.builtin.set_fact:
+    rhel_cac_ssh_users: >-
+      {{ ([rhel_cac_management_user.stdout] + (rhel_cac_effective.accounts | default([]) | map(attribute='name') | list)
+          + ((rhel_cac_effective.privilege | default({})).wheel_members | default([]))) | unique }}
+    cacheable: false
+
+# Check Match User/Group/Address using this actual management connection.
+- name: Read the management SSH connection context
+  ansible.builtin.command:
+    argv: [/usr/bin/printenv, SSH_CONNECTION]
+  become: false
+  changed_when: false
+  check_mode: false
+  register: rhel_cac_ssh_connection
+  when: rhel_cac_ssh_users | length > 0
+
+- name: Require a usable SSH connection context
+  ansible.builtin.assert:
+    that: rhel_cac_ssh_connection.stdout.split() | length == 4
+    quiet: true
+  when: rhel_cac_ssh_users | length > 0
+
+- name: Read SSH authentication policy for each managed user
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/sshd
+      - -T
+      - -C
+      - >-
+        user={{ item }},host={{ rhel_cac_ssh_connection.stdout.split()[0] }},addr={{ rhel_cac_ssh_connection.stdout.split()[0]
+        }},laddr={{ rhel_cac_ssh_connection.stdout.split()[2] }},lport={{ rhel_cac_ssh_connection.stdout.split()[3] }}
+  loop: "{{ rhel_cac_ssh_users }}"
+  changed_when: false
+  check_mode: false
+  register: rhel_cac_sshd_contexts
+
+- name: Require managed-user SSH policy to match CaC
+  ansible.builtin.assert:
+    that:
+      - "('passwordauthentication ' ~ (rhel_cac_effective.ssh.password_authentication | ternary('yes', 'no'))) in item.stdout_lines"
+      - "('kbdinteractiveauthentication ' ~ (rhel_cac_effective.ssh.password_authentication | ternary('yes', 'no'))) in item.stdout_lines"
+    fail_msg: A managed-user Match policy conflicts with CaC; service was not restarted.
+    quiet: true
+  loop: "{{ rhel_cac_sshd_contexts.results }}"
+  when: not ansible_check_mode

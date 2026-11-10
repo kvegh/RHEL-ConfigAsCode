@@ -1,0 +1,26 @@
+---
+- name: Gather platform facts without caching secrets
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - min
+
+- name: Require the supported RHEL platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'RedHat'
+      - ansible_facts.distribution_major_version == '9'
+      - ansible_facts.architecture == 'x86_64'
+    quiet: true
+
+- name: Verify elevated execution
+  ansible.builtin.command:
+    argv: [id, -u]
+  changed_when: false
+  check_mode: false
+  register: rhel_cac_euid
+
+- name: Require root privileges for selected system configuration
+  ansible.builtin.assert:
+    that: rhel_cac_euid.stdout == '0'
+    quiet: true
