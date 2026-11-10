@@ -149,3 +149,42 @@ configuration was never changed. AAP end-to-end acceptance, scanner captures
 and restoration tests remain separate unfinished work; no formal review
 acceptance or new AAP object is claimed. Scanner code follows this completed
 deployment patch as a minor release.
+
+## 2026-11-10 — Capture and replay the first four modules
+
+Implementation commit: `19ead369c53b675815de5b6b78f8f835499cfde3`, scanner
+minor release **0.1.0**, following completed deployment patch **0.0.3**.
+The scanner captures the usable root hash, explicitly selected local accounts
+and public keys, selected wheel membership and the active owned sudo rule,
+and effective SSH authentication settings. It rejects unsupported policy
+rather than claiming a complete replayable capture. Private client keys cannot
+be recovered from targets and are never included. Captures use separate
+stored_config sections; default_config remains unchanged.
+
+Existing certified content and native utilities were checked before choosing
+bounded read-only commands. The publisher requires controller-local pipelined
+module transport with remote-file retention disabled, encrypts through Vault
+stdin, verifies the encrypted readback in memory and publishes exclusively.
+The native file hard-link operation can replace an existing symlink even with
+force disabled; exclusive ln --no-target-directory avoids that overwrite.
+Existing outputs are refused. Capture history and comparison remain deferred.
+
+The recovered scanner file approval was resolved before the subsequent guard
+and validation work. No pending decision was bypassed or old request retried.
+Eight real Ansible fixture tests passed, including precise negative assertions
+for unsupported inputs, existing output and retained module files. All five
+entrypoint syntax checks and offline strict production lint passed with zero
+findings. No dependencies were installed.
+
+The repeatable command-line functional test passed on both authorized guests.
+Its thirteen encrypted evidence records cover default apply, verification,
+repeat apply, scanning, stored replay, verification against captured and original
+desired state, and four fresh key-only logins with uncached passwordless sudo.
+Both complete captures contain four sections and no private keys. The original
+default ciphertext remained byte-identical. All eight changed results during
+the scan round trip were controller-local encrypted workspace/publication work;
+no guest configuration task changed. Temporary private keys were removed.
+
+These results establish the scoped command-line functionality. AAP end-to-end
+acceptance, formal review and snapshot restoration remain unperformed. The
+owner's hold on creating Job Templates remains in force.
