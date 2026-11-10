@@ -111,3 +111,7 @@ source shadow access still needs existing sudo authentication. Test guests are
 being prepared separately. The owner permits local Ansible for development but
 requires AAP from the first functional test. AAP setup and actual deployment,
 verification, repeated apply and key-login tests remain pending.
+
+Implementation commit: `9e64c7c` (deployment patch0.0.2). The scanner has not
+been authored or included in that commit. This record does not turn the pending
+AAP functional checks into passed results.
