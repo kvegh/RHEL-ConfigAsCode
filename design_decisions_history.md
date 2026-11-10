@@ -115,3 +115,37 @@ verification, repeated apply and key-login tests remain pending.
 Implementation commit: `9e64c7c` (deployment patch0.0.2). The scanner has not
 been authored or included in that commit. This record does not turn the pending
 AAP functional checks into passed results.
+
+## 2026-11-10 — Make the command-line deployment test repeatable
+
+Implementation commit: `b6ca6c4`, deployment patch **0.0.3**. The owner selected
+command-line execution for the first functional tests, superseding the earlier
+AAP-first choice while keeping Job Template creation on hold. The existing
+deployment playbooks first passed on both authorized disposable guests at
+`b206bd3` / **0.0.2**: six changed tasks per guest, all 46 state checks per
+guest, zero changes on repeat and four fresh key-only logins with passwordless
+sudo. Cold rollback baselines had been verified before those tests.
+
+The small controller-side runner reuses the existing Ansible/SSH commands for
+protected credential materialization, ordered apply/verify/repeat, encrypted
+evidence, numeric results and cleanup. It tries the generated management key
+first and prompts only for initial authentication refusal; strict enrolled
+host-key checking and fresh key-only connections avoid false login proofs.
+The host-key input was explicitly enrolled on first use, without replacing
+existing pins; no independent hypervisor key attestation is claimed.
+
+An initial runner attempt failed before host access because the C locale did not
+meet ansible-core's UTF-8 requirement. A bounded read-only reproduction confirmed
+that cause. The installed UTF-8 C locale corrected it, and inventory diagnostics
+now remain encrypted with the other evidence. Four mocked controller-path
+checks, Python syntax and whitespace checks passed; these supplement live proof.
+
+The corrected version-controlled runner then passed on both hardened guests:
+both applies made zero changes, both 46-check verifier passes succeeded per
+guest, and all four fresh key/sudo logins succeeded. Temporary private keys
+were removed. Persistent fact caching is explicitly disabled for these test
+runs. Private client keys remain in the encrypted companion, and source host
+configuration was never changed. AAP end-to-end acceptance, scanner captures
+and restoration tests remain separate unfinished work; no formal review
+acceptance or new AAP object is claimed. Scanner code follows this completed
+deployment patch as a minor release.
