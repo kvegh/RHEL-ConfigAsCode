@@ -6,7 +6,7 @@ work; RHEL 8 remains optional funded scope.
 
 ## Status and release order
 
-Working deployment version: **0.0.2**. The first slice implements root hashes,
+Working deployment version: **0.0.3**. The first slice implements root hashes,
 declared local accounts/public keys, wheel sudo and SSH password authentication.
 All modules are optional, including for new running hosts. Selected modules still
 validate their fields and require supported targets and elevated Ansible access.
@@ -102,6 +102,83 @@ Vault input, `config_source` and `config_file`. It checks actual selected host
 settings and fails nonzero on mismatch. Repeat deployment and require no
 unintended changes. Limit testing and cleanup to authorized disposable resources.
 Syntax and local fixtures alone do not prove deployed behavior.
+
+## Automated functional test
+
+The repeatable [functional runner](tests/run_functional.py) exercises the existing
+deployment and verifier playbooks, then fresh client-key authentication. Run it
+only against the two explicitly authorized disposable targets:
+
+```sh
+python3.12 tests/run_functional.py \
+  --inventory <encrypted-test-inventory> \
+  --config <encrypted-default-configuration> \
+  --vault-password-file <protected-vault-password-file> \
+  --collections <existing-installed-collection-roots> \
+  --known-hosts <protected-file-with-explicitly-enrolled-guest-host-keys>
+```
+
+Prerequisites are the existing Python 3.12, Ansible, PyYAML, SSH client,
+UTF-8 C locale and pinned collections. Password bootstrap additionally uses the existing `sshpass` utility;
+the runner installs nothing. The whole-file Vault inventory must list exactly two
+distinct hosts directly in `rhel_cac_targets`, without child groups. Each host
+needs `ansible_host`, `ansible_user`, `rhel_cac_test_guest_uuid` and
+`rhel_cac_test_baseline_snapshot`. Confirm those recorded identities and rollback
+baselines refer to the intended guests before launching; the runner requires the
+fields but does not independently interrogate the hypervisor.
+
+The default configuration must contain the two declared accounts and their
+generated private keys. Both targets use the same declared management account.
+The runner explicitly tests `default_config`; `stored_config` selection remains
+covered by local loader tests until its later scanner workflow is implemented.
+Supply a known-hosts file from the explicitly authorized host-key enrollment.
+Enrollment records first-use trust; it does not imply independent hypervisor
+attestation of the keys. Every test SSH
+connection uses strict host-key checking; the runner neither accepts new host
+keys nor replaces existing pins. Transport or host-key failures stop the test.
+
+On a fresh baseline, the generated management key can be absent: the runner tries
+it first, then prompts through `getpass` for the existing test SSH/sudo password
+only after authentication refusal. That existing bootstrap password must apply
+to both targets. A repeat on hardened targets uses the deployed key and
+passwordless sudo without forcing a password login. Password values are never
+command arguments or log output.
+
+The workflow applies, verifies, applies again and verifies again. Both verifier
+runs and the repeated apply must report zero changes. It then makes four fresh
+key-only connections, one per declared account on each guest, disables SSH agent
+and connection reuse, and verifies passwordless sudo returns UID zero. A mismatch,
+failed command or unexpected repeat change gives exit status 1 and a final JSON
+`functional_result: FAIL`; success gives exit status 0 and `PASS`.
+
+Raw stage output and the summary are retained only as Vault ciphertext in an
+owner-private evidence directory named in the final JSON. Console summaries show
+numeric totals rather than inventory/account names. Runtime private keys and
+encrypted launch variables are created under a mode-700 temporary directory;
+individual files use mode 600. Cleanup runs on normal success and handled failure,
+and the final result reports whether the temporary directory was removed. A hard
+process kill or host failure can prevent cleanup; inspect protected temporary
+data before another run. The runner creates no snapshots, rolls nothing back,
+deletes no guests and changes no unrelated resources. Restore a baseline only
+through a separately authorized operation.
+
+This small controller-side helper uses the standard Ansible and OpenSSH tools
+plus Ansible's Vault library. Its concrete gap is orchestrating the existing
+playbooks, checking their machine-detectable recaps, temporarily materializing
+encrypted client credentials and proving fresh SSH logins with cleanup. Native
+modules and certified roles still perform the actual host configuration. It adds
+no custom Ansible module/plugin, service or testing framework.
+
+The earlier command-line run against published deployment **0.0.2 / `b206bd3`**
+passed on both authorized guests: first apply changed six tasks per guest,
+46 verifier checks passed per guest, repeat apply changed zero tasks, repeat
+verification passed, and all four fresh key/sudo logins passed. That evidence came
+from the preceding one-off driver. The version-controlled runner in patch
+**0.0.3** also passed against the hardened guests: both applies reported zero
+changes, both verifier runs passed all 46 checks per guest, and all four fresh
+key/sudo logins passed using the explicitly enrolled host keys. Its protected
+runtime key files were removed. This is command-line functional evidence;
+AAP end-to-end acceptance remains future work under the job-template hold.
 
 AAP must use an appropriate EE, Machine and Vault credentials, and materialize
 encrypted input inside the job's own protected workspace using approved repository
