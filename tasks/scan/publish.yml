@@ -1,0 +1,114 @@
+---
+- name: Encrypt, verify and publish one new controller-side capture
+  delegate_to: localhost
+  become: false
+  vars:
+    ansible_connection: local
+    ansible_pipelining: true
+  block:
+    # Without pipelining, the command module's stdin can enter a temporary module wrapper.
+    # Justification: [scanner implementation](../../README.md#scanner-implementation).
+    - name: Require protected in-memory module transport for capture encryption
+      ansible.builtin.assert:
+        that:
+          - ansible_connection == 'local'
+          - ansible_pipelining | bool
+          - not (lookup('ansible.builtin.config', 'DEFAULT_KEEP_REMOTE_FILES') | bool)
+        fail_msg: Capture encryption requires local pipelining and disabled remote-file retention.
+        quiet: true
+
+    - name: Create a private ciphertext workspace on the destination filesystem
+      ansible.builtin.tempfile:
+        state: directory
+        path: "{{ rhel_cac_scan_output_file | dirname }}"
+        prefix: .rhel-cac-scan-
+      register: rhel_cac_scan_workspace
+
+    - name: Restrict the ciphertext workspace to its owner
+      ansible.builtin.file:
+        path: "{{ rhel_cac_scan_workspace.path }}"
+        state: directory
+        mode: '0700'
+
+    # Native Vault reads plaintext from stdin; no plaintext capture file is created.
+    # Justification: [scanner implementation](../../README.md#scanner-implementation).
+    - name: Encrypt the captured document directly from protected stdin
+      ansible.builtin.command:
+        argv:
+          - ansible-vault
+          - encrypt
+          - --vault-password-file
+          - "{{ rhel_cac_scan_vault_password_file }}"
+          - --output
+          - "{{ rhel_cac_scan_workspace.path }}/capture.vault.yml"
+        stdin: "{{ rhel_cac_scan_document | to_nice_yaml(sort_keys=false) }}"
+        stdin_add_newline: false
+      changed_when: true
+
+    - name: Restrict the encrypted capture to its owner
+      ansible.builtin.file:
+        path: "{{ rhel_cac_scan_workspace.path }}/capture.vault.yml"
+        mode: '0600'
+
+    - name: Inspect the encrypted capture header
+      ansible.builtin.slurp:
+        src: "{{ rhel_cac_scan_workspace.path }}/capture.vault.yml"
+      register: rhel_cac_scan_cipher_read
+
+    - name: Require whole-file Vault ciphertext
+      ansible.builtin.assert:
+        that: (rhel_cac_scan_cipher_read.content | b64decode).startswith('$ANSIBLE_VAULT;')
+        quiet: true
+
+    - name: Read back the encrypted document into protected process memory
+      ansible.builtin.command:
+        argv:
+          - ansible-vault
+          - view
+          - --vault-password-file
+          - "{{ rhel_cac_scan_vault_password_file }}"
+          - "{{ rhel_cac_scan_workspace.path }}/capture.vault.yml"
+      changed_when: false
+      register: rhel_cac_scan_readback
+
+    - name: Require exact encrypted document readback before publication
+      ansible.builtin.assert:
+        that: (rhel_cac_scan_readback.stdout | from_yaml) == rhel_cac_scan_document
+        quiet: true
+
+    - name: Recheck that the final capture path is still absent
+      ansible.builtin.stat:
+        path: "{{ rhel_cac_scan_output_file }}"
+        follow: false
+        get_checksum: false
+        get_mime: false
+        get_attributes: false
+      register: rhel_cac_scan_final_destination
+
+    - name: Refuse publication over an existing path
+      ansible.builtin.assert:
+        that: not rhel_cac_scan_final_destination.stat.exists
+        fail_msg: The capture destination appeared during collection; no existing file was replaced.
+        quiet: true
+
+    # The native file module may replace an existing symlink even with force=false.
+    # GNU ln -T instead creates an exclusive hard link and refuses every existing destination.
+    # Justification: [scanner implementation](../../README.md#scanner-implementation).
+    - name: Publish ciphertext atomically without replacing any destination
+      ansible.builtin.command:
+        argv:
+          - ln
+          - --no-target-directory
+          - --
+          - "{{ rhel_cac_scan_workspace.path }}/capture.vault.yml"
+          - "{{ rhel_cac_scan_output_file }}"
+      changed_when: true
+
+  always:
+    - name: Remove only this scan's private ciphertext workspace
+      ansible.builtin.file:
+        path: "{{ rhel_cac_scan_workspace.path }}"
+        state: absent
+      when:
+        - rhel_cac_scan_workspace is defined
+        - rhel_cac_scan_workspace.path is defined

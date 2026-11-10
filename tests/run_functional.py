@@ -43,6 +43,8 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--vault-password-file", required=True)
     parser.add_argument("--collections", required=True)
+    parser.add_argument("--scan-output-directory",
+                        help="Optional new capture paths for the scanner/stored-config round trip")
     parser.add_argument("--known-hosts", required=True,
                         help="Protected file containing the explicitly enrolled guest host keys")
     args = parser.parse_args()
@@ -228,6 +230,53 @@ def main():
                                            env=environment, capture_output=True, text=True,
                                            timeout=1200, check=False)
                 record(stage, completed, time.monotonic() - start, recap=True, unchanged=unchanged)
+            if args.scan_output_directory:
+                scan_directory = Path(args.scan_output_directory).resolve()
+                scan_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+                capture_paths = [scan_directory / ("capture-" + str(index + 1).zfill(2) + ".vault.yml")
+                                 for index in range(len(names))]
+                if any(path.exists() or path.is_symlink() for path in capture_paths):
+                    raise RuntimeError("Scanner tests require new capture paths; existing captures are preserved")
+                scan_hosts = {}
+                for name, capture in zip(names, capture_paths):
+                    scan_hosts[name] = dict(hostvars[name],
+                                            rhel_cac_scan_output_file=str(capture))
+                scan_inventory = {"all": {"children": {
+                    "rhel_cac_targets": {"hosts": scan_hosts}}}}
+                scan_inventory_file = runtime / "scan-inventory.vault.yml"
+                protected_write(scan_inventory_file,
+                                vault.encrypt(yaml.safe_dump(scan_inventory).encode()))
+                scan_vars = {key: value for key, value in runtime_vars.items()
+                             if key not in ("config_source", "config_file")}
+                scan_vars.update({
+                    "rhel_cac_scan_modules": list(configuration["rhel_cac"]["default_config"]),
+                    "rhel_cac_scan_accounts": [account["name"] for account in accounts],
+                    "rhel_cac_scan_vault_password_file": str(vault_path),
+                    "rhel_cac_test_default_config_file": str(config_path),
+                })
+                scan_vars_file = runtime / "scan-vars.vault.yml"
+                protected_write(scan_vars_file,
+                                vault.encrypt(yaml.safe_dump(scan_vars).encode()))
+                start = time.monotonic()
+                completed = subprocess.run(
+                    ["ansible-playbook", "-i", str(scan_inventory_file),
+                     "--vault-password-file", str(vault_path),
+                     "-e", "@" + str(scan_vars_file),
+                     str(source / "tests/scan_roundtrip.yml")],
+                    cwd=source, env=environment, capture_output=True,
+                    text=True, timeout=1200, check=False,
+                )
+                record("scan-stored-roundtrip", completed,
+                       time.monotonic() - start, recap=True)
+                for capture in capture_paths:
+                    if not capture.read_bytes().startswith(b"$ANSIBLE_VAULT;"):
+                        raise RuntimeError("A stored capture is not whole-file encrypted")
+                    if capture.stat().st_mode & 0o077:
+                        raise RuntimeError("A stored capture has excessive local permissions")
+                if config_path.read_bytes() != ciphertext:
+                    raise RuntimeError("The original default configuration ciphertext changed")
+                print(json.dumps({"scan_capture_count": len(capture_paths),
+                                  "default_configuration_unchanged": True}), flush=True)
             for host_index, name in enumerate(names):
                 for account_index, account in enumerate(accounts):
                     start = time.monotonic()

@@ -62,3 +62,19 @@ Arbitrary custom sudo/SSH constructs remain outside this initial bounded scope.
 
 Scan-version retention and comparison is a separate owner-requested discussion
 tracked in Beads; no retention policy or comparison component is selected.
+
+
+## Initial scanner contract
+
+The minor scanner release captures exactly the four implemented modules.
+Explicitly selected local accounts supply observed homes/shells and plain public
+authorization keys; private client keys remain only in original encrypted
+defaults. Wheel membership includes primary groups, and sudo capture is limited
+to the active owned wheel ALL rule with explicit PASSWD/NOPASSWD.
+
+Root capture requires a representable usable hash. SSH capture requires both
+password methods to agree and selected-user/management-context checks to pass.
+Unsupported data fails before publication. Each new per-host encrypted file has
+empty defaults, flat observed `stored_config` and separate completeness/source
+metadata. Existing output files are preserved; history/comparison remains a
+separate undecided capability. See the [scanner inputs and implementation](../README.md#scan-the-supported-configuration).

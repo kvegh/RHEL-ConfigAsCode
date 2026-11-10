@@ -1,0 +1,105 @@
+---
+- name: Require real scan execution and explicit protected output inputs
+  ansible.builtin.assert:
+    that:
+      - not ansible_check_mode
+      - rhel_cac_scan_output_file is defined
+      - rhel_cac_scan_output_file is string
+      - rhel_cac_scan_output_file is match('^/(?:[^/\r\n]+/)*[^/\r\n]+$')
+      - rhel_cac_scan_output_file is not search('(^|/)\.\.?(/|$)')
+      - rhel_cac_scan_vault_password_file is defined
+      - rhel_cac_scan_vault_password_file is string
+      - rhel_cac_scan_vault_password_file is match('^/[^\r\n]+$')
+    fail_msg: Supply a new absolute capture path and the existing protected controller Vault password file; do not use check mode.
+    quiet: true
+
+- name: Resolve the explicitly selected scanner scope
+  ansible.builtin.set_fact:
+    rhel_cac_scan_selected_modules: "{{ rhel_cac_scan_modules | default(['root_password', 'accounts', 'privilege', 'ssh']) }}"
+    rhel_cac_scan_selected_accounts: "{{ rhel_cac_scan_accounts | default([]) }}"
+    cacheable: false
+
+- name: Validate scanner module and account selection
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_selected_modules is sequence
+      - rhel_cac_scan_selected_modules is not string
+      - rhel_cac_scan_selected_modules is not mapping
+      - rhel_cac_scan_selected_modules | difference(['root_password', 'accounts', 'privilege', 'ssh']) | length == 0
+      - rhel_cac_scan_selected_modules | unique | length == rhel_cac_scan_selected_modules | length
+      - rhel_cac_scan_selected_accounts is sequence
+      - rhel_cac_scan_selected_accounts is not string
+      - rhel_cac_scan_selected_accounts is not mapping
+      - rhel_cac_scan_selected_accounts | unique | length == rhel_cac_scan_selected_accounts | length
+      - >-
+        (rhel_cac_scan_selected_modules | intersect(['accounts', 'privilege']) | length == 0)
+        or rhel_cac_scan_accounts is defined
+    fail_msg: Choose supported modules and explicitly supply the selected local account list when capturing accounts or privilege.
+    quiet: true
+
+- name: Validate selected local account names
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item is match('^[a-z_][a-z0-9_-]*[$]?$')
+      - item != 'root'
+    quiet: true
+  loop: "{{ rhel_cac_scan_selected_accounts }}"
+
+- name: Require one distinct output path for each selected target
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_output_paths | unique | length == ansible_play_hosts_all | length
+    fail_msg: Assign a distinct capture path per host or limit this scan to one host.
+    quiet: true
+  vars:
+    rhel_cac_scan_output_paths: "{{ ansible_play_hosts_all | map('extract', hostvars, 'rhel_cac_scan_output_file') | list }}"
+
+- name: Inspect the capture destination before reading target configuration
+  ansible.builtin.stat:
+    path: "{{ rhel_cac_scan_output_file }}"
+    follow: false
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  delegate_to: localhost
+  become: false
+  register: rhel_cac_scan_initial_destination
+
+- name: Refuse an existing capture destination
+  ansible.builtin.assert:
+    that: not rhel_cac_scan_initial_destination.stat.exists
+    fail_msg: The scanner creates new captures only; the selected output already exists.
+    quiet: true
+
+- name: Inspect the existing output directory
+  ansible.builtin.stat:
+    path: "{{ rhel_cac_scan_output_file | dirname }}"
+    follow: true
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  delegate_to: localhost
+  become: false
+  register: rhel_cac_scan_parent_directory
+
+- name: Inspect the existing protected Vault password source
+  ansible.builtin.stat:
+    path: "{{ rhel_cac_scan_vault_password_file }}"
+    follow: true
+    get_checksum: false
+    get_mime: false
+    get_attributes: false
+  delegate_to: localhost
+  become: false
+  register: rhel_cac_scan_password_source
+
+- name: Require an existing directory and owner-only readable Vault source
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_parent_directory.stat.isdir | default(false)
+      - rhel_cac_scan_password_source.stat.isreg | default(false)
+      - rhel_cac_scan_password_source.stat.readable | default(false)
+      - rhel_cac_scan_password_source.stat.mode in ['0400', '0600']
+    fail_msg: The capture directory must exist and the protected Vault file must be readable with mode 0400 or 0600.
+    quiet: true

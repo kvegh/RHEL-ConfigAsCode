@@ -1,0 +1,35 @@
+---
+- name: Verify the structure and supported scope of the encrypted capture
+  hosts: rhel_cac_targets
+  gather_facts: false
+  become: false
+  no_log: true
+  any_errors_fatal: true
+  vars:
+    config_source: stored_config
+    config_file: "{{ rhel_cac_scan_output_file }}"
+  tasks:
+    - name: Load and validate the actual encrypted stored configuration
+      ansible.builtin.import_tasks: ../tasks/load_config.yml
+
+    - name: Require a completed capture containing exactly the selected modules
+      ansible.builtin.assert:
+        that:
+          - rhel_cac_document.rhel_cac.schema_version == 1
+          - rhel_cac_document.rhel_cac.default_config == {}
+          - rhel_cac_document.scan_metadata.complete is sameas true
+          - >-
+            rhel_cac_document.rhel_cac.stored_config.keys() | list | sort ==
+            (rhel_cac_scan_modules | default(['root_password', 'accounts', 'privilege', 'ssh'])) | sort
+        quiet: true
+
+    - name: Require exactly the selected accounts without copied private keys
+      ansible.builtin.assert:
+        that:
+          - >-
+            rhel_cac_effective.accounts | map(attribute='name') | list | sort ==
+            rhel_cac_scan_accounts | sort
+          - >-
+            rhel_cac_effective.accounts | selectattr('ssh_private_key', 'defined') | list | length == 0
+        quiet: true
+      when: "'accounts' in (rhel_cac_scan_modules | default(['root_password', 'accounts', 'privilege', 'ssh']))"

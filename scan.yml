@@ -1,0 +1,45 @@
+---
+# Read the first supported configuration modules without changing the target.
+# Publish one new encrypted capture only after parsing and validating every selected module.
+- name: Capture selected RHEL operating system configuration
+  hosts: rhel_cac_targets
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  no_log: true
+  tasks:
+    - name: Validate scanner inputs and the new capture destination
+      ansible.builtin.import_tasks: tasks/scan/inputs.yml
+
+    - name: Verify target platform and elevated read access
+      ansible.builtin.import_tasks: tasks/preflight.yml
+
+    - name: Read selected operating system configuration
+      ansible.builtin.import_tasks: tasks/scan/read.yml
+
+    - name: Parse the selected local accounts
+      ansible.builtin.import_tasks: tasks/scan/parse_accounts.yml
+      when: rhel_cac_scan_selected_modules | intersect(['accounts', 'privilege']) | length > 0
+
+    - name: Read selected accounts' authorized public keys
+      ansible.builtin.slurp:
+        src: "{{ item.home }}/.ssh/authorized_keys"
+      loop: "{{ rhel_cac_scan_account_entries | default([]) }}"
+      register: rhel_cac_scan_key_reads
+      when: "'accounts' in rhel_cac_scan_selected_modules"
+
+    - name: Build the bounded captured configuration
+      ansible.builtin.import_tasks: tasks/scan/build.yml
+
+    - name: Validate captured values against the deployment contract
+      ansible.builtin.import_tasks: tasks/validate_config.yml
+
+    - name: Verify captured SSH policy in the actual management context
+      ansible.builtin.import_tasks: tasks/verify_ssh.yml
+      vars:
+        rhel_cac_ssh_context_users: "{{ rhel_cac_scan_selected_accounts }}"
+      when: "'ssh' in rhel_cac_scan_selected_modules"
+
+    - name: Publish the new encrypted capture
+      ansible.builtin.import_tasks: tasks/scan/publish.yml

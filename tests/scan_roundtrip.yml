@@ -1,0 +1,26 @@
+---
+# Use only disposable targets already authorized for the deployment functional test.
+# Runtime inventory supplies unique new capture paths and protected credentials.
+- name: Capture the selected deployed configuration
+  ansible.builtin.import_playbook: ../scan.yml
+
+- name: Verify the encrypted capture before replay
+  ansible.builtin.import_playbook: verify_capture.yml
+
+- name: Replay the captured configuration
+  ansible.builtin.import_playbook: ../deploy.yml
+  vars:
+    config_source: stored_config
+    config_file: "{{ rhel_cac_scan_output_file }}"
+
+- name: Verify deployment against the capture
+  ansible.builtin.import_playbook: verify.yml
+  vars:
+    config_source: stored_config
+    config_file: "{{ rhel_cac_scan_output_file }}"
+
+- name: Verify roundtrip state against the original defaults
+  ansible.builtin.import_playbook: verify.yml
+  vars:
+    config_source: default_config
+    config_file: "{{ rhel_cac_test_default_config_file }}"

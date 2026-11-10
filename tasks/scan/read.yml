@@ -1,0 +1,67 @@
+---
+- name: Read the observed hostname
+  ansible.builtin.command:
+    argv: [hostname]
+  changed_when: false
+  register: rhel_cac_scan_hostname_read
+
+- name: Read the capture time in UTC
+  ansible.builtin.command:
+    argv: [date, -u, '+%Y-%m-%dT%H:%M:%SZ']
+  changed_when: false
+  register: rhel_cac_scan_time_read
+
+# The getent module returns cacheable ansible_facts; register sensitive reads instead.
+# Justification: [scanner implementation](../../README.md#scanner-implementation).
+- name: Read the local root shadow entry without creating a shadow fact
+  ansible.builtin.command:
+    argv: [getent, -s, files, shadow, root]
+  changed_when: false
+  register: rhel_cac_scan_root_read
+  when: "'root_password' in rhel_cac_scan_selected_modules"
+
+- name: Read only the selected local account entries
+  ansible.builtin.command:
+    argv: [getent, -s, files, passwd, "{{ item }}"]
+  loop: "{{ rhel_cac_scan_selected_accounts }}"
+  changed_when: false
+  register: rhel_cac_scan_account_reads
+  when: rhel_cac_scan_selected_modules | intersect(['accounts', 'privilege']) | length > 0
+
+- name: Read selected accounts' group names including their primary group
+  ansible.builtin.command:
+    argv: [id, -nG, "{{ item }}"]
+  loop: "{{ rhel_cac_scan_selected_accounts }}"
+  changed_when: false
+  register: rhel_cac_scan_group_reads
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Read only the owned wheel sudo policy
+  ansible.builtin.slurp:
+    src: /etc/sudoers.d/90-rhel-cac
+  register: rhel_cac_scan_sudo_read
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Validate the active combined sudo configuration
+  ansible.builtin.command:
+    argv: [/usr/sbin/visudo, -c]
+  environment:
+    LC_ALL: C
+  changed_when: false
+  register: rhel_cac_scan_sudo_validation
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Require the owned sudo policy to be included in the active configuration
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_sudo_validation.stdout_lines | select('match', '^/etc/sudoers\.d/90-rhel-cac:') | list | length == 1
+    fail_msg: The owned sudo file is not included in the validated active sudo policy.
+    quiet: true
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Read effective global SSH authentication policy
+  ansible.builtin.command:
+    argv: [/usr/sbin/sshd, -T]
+  changed_when: false
+  register: rhel_cac_scan_sshd_read
+  when: "'ssh' in rhel_cac_scan_selected_modules"

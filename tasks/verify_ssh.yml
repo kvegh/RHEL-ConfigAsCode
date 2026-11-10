@@ -34,7 +34,8 @@
   ansible.builtin.set_fact:
     rhel_cac_ssh_users: >-
       {{ ([rhel_cac_management_user.stdout] + (rhel_cac_effective.accounts | default([]) | map(attribute='name') | list)
-          + ((rhel_cac_effective.privilege | default({})).wheel_members | default([]))) | unique }}
+          + ((rhel_cac_effective.privilege | default({})).wheel_members | default([]))
+          + (rhel_cac_ssh_context_users | default([]))) | unique }}
     cacheable: false
 
 # Check Match User/Group/Address using this actual management connection.

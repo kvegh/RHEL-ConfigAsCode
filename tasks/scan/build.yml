@@ -1,0 +1,125 @@
+---
+- name: Start a capture without default configuration or private client keys
+  ansible.builtin.set_fact:
+    rhel_cac_scan_stored: {}
+    cacheable: false
+
+- name: Require one complete local root shadow entry
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_root_read.stdout.splitlines() | length == 1
+      - rhel_cac_scan_root_read.stdout.split(':') | length == 9
+      - rhel_cac_scan_root_read.stdout.split(':')[0] == 'root'
+    fail_msg: The selected root module requires one readable local shadow entry.
+    quiet: true
+  when: "'root_password' in rhel_cac_scan_selected_modules"
+
+- name: Capture the observed root password hash only
+  ansible.builtin.set_fact:
+    rhel_cac_scan_stored: "{{ rhel_cac_scan_stored | combine({'root_password': {'password_hash': rhel_cac_scan_root_read.stdout.split(':')[1]}}) }}"
+    cacheable: false
+  when: "'root_password' in rhel_cac_scan_selected_modules"
+
+- name: Start the captured selected-account configuration
+  ansible.builtin.set_fact:
+    rhel_cac_scan_captured_accounts: []
+    cacheable: false
+  when: "'accounts' in rhel_cac_scan_selected_modules"
+
+- name: Capture selected public authorization keys without private key material
+  ansible.builtin.set_fact:
+    rhel_cac_scan_captured_accounts: >-
+      {{ rhel_cac_scan_captured_accounts + [item.item | combine({'ssh_public_keys':
+          (item.content | b64decode).splitlines() | map('trim') | reject('match', '^(#|$)') | list})] }}
+    cacheable: false
+  loop: "{{ rhel_cac_scan_key_reads.results | default([]) }}"
+  when: "'accounts' in rhel_cac_scan_selected_modules"
+
+- name: Add the captured account list
+  ansible.builtin.set_fact:
+    rhel_cac_scan_stored: "{{ rhel_cac_scan_stored | combine({'accounts': rhel_cac_scan_captured_accounts}) }}"
+    cacheable: false
+  when: "'accounts' in rhel_cac_scan_selected_modules"
+
+- name: Require the owned sudo file to contain no additional includes
+  ansible.builtin.assert:
+    that:
+      - (rhel_cac_scan_sudo_read.content | b64decode) is not search('(?m)^\s*[#@]include')
+    fail_msg: The owned sudo file contains unsupported include directives.
+    quiet: true
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Select the owned sudo rule and start the captured wheel membership
+  ansible.builtin.set_fact:
+    rhel_cac_scan_sudo_lines: "{{ (rhel_cac_scan_sudo_read.content | b64decode).splitlines() | map('trim') | reject('match', '^(#|$)') | list }}"
+    rhel_cac_scan_wheel_members: []
+    cacheable: false
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Require exactly the supported owned wheel rule
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_sudo_lines | length == 1
+      - rhel_cac_scan_sudo_lines[0] is match('^%wheel\s+ALL\s*=\s*\(ALL\)\s*(NOPASSWD|PASSWD)\s*:\s*ALL\s*$')
+    fail_msg: The scanner supports only the owned wheel ALL rule with explicit PASSWD or NOPASSWD.
+    quiet: true
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Keep only selected accounts that belong to wheel
+  ansible.builtin.set_fact:
+    rhel_cac_scan_wheel_members: "{{ rhel_cac_scan_wheel_members + [item.item] }}"
+    cacheable: false
+  loop: "{{ rhel_cac_scan_group_reads.results | default([]) }}"
+  when:
+    - "'privilege' in rhel_cac_scan_selected_modules"
+    - "'wheel' in item.stdout.split()"
+
+- name: Capture the owned wheel policy
+  ansible.builtin.set_fact:
+    rhel_cac_scan_stored: >-
+      {{ rhel_cac_scan_stored | combine({'privilege': {'wheel_members': rhel_cac_scan_wheel_members,
+          'wheel_nopasswd': rhel_cac_scan_sudo_lines[0] is search('NOPASSWD\s*:')}}) }}
+    cacheable: false
+  when: "'privilege' in rhel_cac_scan_selected_modules"
+
+- name: Select the two supported effective SSH authentication values
+  ansible.builtin.set_fact:
+    rhel_cac_scan_password_lines: "{{ rhel_cac_scan_sshd_read.stdout_lines | select('match', '^passwordauthentication (yes|no)$') | list }}"
+    rhel_cac_scan_keyboard_lines: "{{ rhel_cac_scan_sshd_read.stdout_lines | select('match', '^kbdinteractiveauthentication (yes|no)$') | list }}"
+    cacheable: false
+  when: "'ssh' in rhel_cac_scan_selected_modules"
+
+- name: Require SSH policy representable by the single supported boolean
+  ansible.builtin.assert:
+    that:
+      - rhel_cac_scan_password_lines | length == 1
+      - rhel_cac_scan_keyboard_lines | length == 1
+      - rhel_cac_scan_password_lines[0].split()[1] == rhel_cac_scan_keyboard_lines[0].split()[1]
+      - "'usedns no' in rhel_cac_scan_sshd_read.stdout_lines"
+    fail_msg: Capturing SSH requires matching password methods and UseDNS no; arbitrary policy conversion is unsupported.
+    quiet: true
+  when: "'ssh' in rhel_cac_scan_selected_modules"
+
+- name: Capture the supported SSH authentication setting
+  ansible.builtin.set_fact:
+    rhel_cac_scan_stored: "{{ rhel_cac_scan_stored | combine({'ssh': {'password_authentication': rhel_cac_scan_password_lines[0].split()[1] == 'yes'}}) }}"
+    cacheable: false
+  when: "'ssh' in rhel_cac_scan_selected_modules"
+
+- name: Build the independent stored configuration and separate capture metadata
+  ansible.builtin.set_fact:
+    rhel_cac_effective: "{{ rhel_cac_scan_stored }}"
+    rhel_cac_scan_document:
+      rhel_cac:
+        schema_version: 1
+        default_config: {}
+        stored_config: "{{ rhel_cac_scan_stored }}"
+      scan_metadata:
+        complete: true
+        source_hostname: "{{ rhel_cac_scan_hostname_read.stdout }}"
+        captured_at: "{{ rhel_cac_scan_time_read.stdout }}"
+        modules: "{{ rhel_cac_scan_selected_modules }}"
+        selected_accounts: "{{ rhel_cac_scan_selected_accounts }}"
+        scope: selected_local_accounts_and_owned_sudo_rule
+        private_client_keys_captured: false
+    cacheable: false

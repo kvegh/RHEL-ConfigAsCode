@@ -6,14 +6,14 @@ work; RHEL 8 remains optional funded scope.
 
 ## Status and release order
 
-Working deployment version: **0.0.3**. The first slice implements root hashes,
+Working version: **0.1.0**. The first slice implements root hashes,
 declared local accounts/public keys, wheel sudo and SSH password authentication.
 All modules are optional, including for new running hosts. Selected modules still
 validate their fields and require supported targets and elevated Ansible access.
 
-Deployment playbooks must be finished and committed first as patch releases.
-Their scanners follow in a minor release. No scanner belongs to this deployment
-slice. Actual publication and test results/gaps are recorded in the decision history.
+Deployment patches **0.0.2** and **0.0.3** were completed, committed and
+functionally tested first. This minor release adds matching bounded scanners.
+Actual publication and test results/gaps are recorded in the decision history.
 
 ## Configuration and use
 
@@ -24,7 +24,7 @@ Vault password file outside Git. The private companion is not an umbrella submod
 
 The [generic template](templates/host-config.yml) has schema version 1 and two
 independent maps under `rhel_cac`: `default_config` for declared defaults and
-`stored_config` for later scanned observations. Separate `scan_metadata` never
+`stored_config` for scanned observations. Separate `scan_metadata` never
 selects a deployment module. The generic template itself is not a deployable
 plaintext configuration.
 
@@ -74,6 +74,74 @@ that check's evidence; hostname-based Match policy is not generalized here.
 See [module contracts](docs/modules.md) and the [System Roles catalogue](docs/system-roles.md).
 Later modules, account lifecycle and arbitrary sudo/SSH grammar are not implemented.
 
+## Scan the supported configuration
+
+[scan.yml](scan.yml) reads the same four modules and creates one new whole-file
+Vault capture per selected host. Capture files keep `default_config: {}`, place
+observed values in `stored_config`, and keep source/time/completeness information
+in separate `scan_metadata`. The original defaults and their private client keys
+are untouched. A completed capture means complete for its selected scope.
+
+| Scanner module | Supported observations |
+|---|---|
+| `root_password` | One local usable SHA-512/yescrypt root hash; locked, empty or other formats fail |
+| `accounts` | Explicitly selected local accounts, current absolute home/shell and plain supported OpenSSH public-key lines |
+| `privilege` | Selected local accounts' wheel membership, including primary membership, and the active owned wheel rule |
+| `ssh` | Matching effective password/keyboard-interactive booleans with UseDNS no, checked for selected users and the actual management connection |
+
+Account passwords, aging, UID/GID migration, authorized-key options/certificates,
+private client keys, arbitrary sudo grammar and general SSH Match conversion
+remain outside this slice. Unrepresentable or inaccessible data fails before a
+capture is published. Account comments/blank key lines are ignored; authorization
+options are never stripped to make a different key usable.
+
+| Scanner input | Meaning |
+|---|---|
+| `rhel_cac_scan_modules` | Optional list drawn from the four module names; defaults to all four; an empty list is allowed |
+| `rhel_cac_scan_accounts` | Explicit selected local account list when capturing accounts or privilege |
+| `rhel_cac_scan_output_file` | Required new absolute controller-side path, distinct for every selected host; parent directory must already exist |
+| `rhel_cac_scan_vault_password_file` | Required existing readable owner-only controller Vault password file, mode 0400 or 0600 |
+
+Supply real values through protected inventory/variables. For two hosts, assign
+different generic capture filenames in their encrypted host variables; real
+hostnames must not become plaintext Git filenames. A one-host `--limit` may use
+a single explicit output path.
+
+```sh
+ansible-playbook -i <encrypted-scan-inventory> scan.yml \
+  --vault-password-file <protected-vault-password-file>
+```
+
+The scanner refuses check mode and every existing destination, including a
+symlink. It creates new captures only and does not choose a history, overwrite,
+retention or comparison policy. That separate design discussion remains queued.
+To replay a capture, run `deploy.yml` with its encrypted `config_file` and
+required `config_source=stored_config`; it does not inherit defaults/private
+client keys from another file.
+
+### Scanner implementation
+
+Native modules collect files and ordinary data. Registered `getent -s files`
+commands keep shadow/account reads out of cacheable Ansible facts; `id -nG`
+includes primary as well as supplementary groups. The certified sudo/SSH roles
+configure their supported policy but do not export these CaC fields, so bounded
+native utility reads are used. Sudo syntax and inclusion of the owned rule are
+checked; unrelated grants are not exported.
+
+The standard Vault CLI encrypts protected stdin in a private controller
+workspace, then decrypts into process memory to verify exact readback before
+publication. Local pipelining is required so the captured stdin is not written
+inside a temporary module wrapper; keeping remote module files is refused.
+Only ciphertext is written into the capture workspace.
+
+GNU `ln --no-target-directory` publishes the verified ciphertext with an atomic
+exclusive create. The installed native file module can replace an existing
+symlink even with `force: false`; this concrete gap requires the small native
+command. No force option is used, so existing files/directories/symlinks are
+preserved even if one appears during publication. Temporary ciphertext is
+removed after success or handled failure. No new component, custom module,
+general parser or dependency is introduced.
+
 ## Dependencies, AAP and verification
 
 [Collection requirements](collections/requirements.yml) pin certified
@@ -94,7 +162,7 @@ Local contract tests use real encrypted fixtures and Ansible without host change
 ```sh
 python3.12 -m unittest discover -s tests -v
 ansible-playbook --syntax-check -i <protected-inventory> deploy.yml
-ansible-lint --profile production --strict
+ansible-lint --offline --profile production --strict
 ```
 
 Run `tests/verify.yml` after deployment with the same protected inventory,
@@ -179,6 +247,25 @@ changes, both verifier runs passed all 46 checks per guest, and all four fresh
 key/sudo logins passed using the explicitly enrolled host keys. Its protected
 runtime key files were removed. This is command-line functional evidence;
 AAP end-to-end acceptance remains future work under the job-template hold.
+
+To include the scanner and stored-configuration round trip, add
+`--scan-output-directory <private-capture-directory>` to the functional command.
+The two generic capture filenames in that directory must not exist. The runner
+uses a protected temporary inventory to scan, checks the encrypted capture
+structure/scope, replays each host's `stored_config`, verifies it, then verifies
+the original defaults again. It checks that default ciphertext stayed identical
+and ends with the same fresh key/sudo checks. The generated captures are kept;
+the runner does not delete or overwrite prior captures.
+
+The **0.1.0** command-line round trip passed on both authorized guests. It
+created two complete encrypted captures, replayed `stored_config`, passed the
+captured-state and original-default verifiers, and finished all four fresh
+key-only/passwordless-sudo checks. The scan/replay phase completed 506 successful
+tasks with eight changes, all delegated controller ciphertext-publication work;
+no guest configuration task changed. Original default ciphertext was identical.
+Eight real Ansible capture fixtures, strict offline production lint and all five
+entry-point syntax checks also passed. This does not establish AAP acceptance or
+test snapshot restoration.
 
 AAP must use an appropriate EE, Machine and Vault credentials, and materialize
 encrypted input inside the job's own protected workspace using approved repository

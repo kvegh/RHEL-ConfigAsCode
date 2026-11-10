@@ -1,0 +1,25 @@
+---
+- name: Start the selected local account list
+  ansible.builtin.set_fact:
+    rhel_cac_scan_account_entries: []
+    cacheable: false
+
+- name: Require one supported local passwd entry for each selected account
+  ansible.builtin.assert:
+    that:
+      - item.stdout.splitlines() | length == 1
+      - item.stdout.split(':') | length == 7
+      - item.stdout.split(':')[0] == item.item
+      - item.stdout.split(':')[5] is match('^/[^\r\n]+$')
+      - item.stdout.split(':')[6] is match('^/[^\r\n]+$')
+    fail_msg: A selected account does not have one supported local passwd entry with an absolute home and shell.
+    quiet: true
+  loop: "{{ rhel_cac_scan_account_reads.results }}"
+
+- name: Keep only account fields supported by the deployment contract
+  ansible.builtin.set_fact:
+    rhel_cac_scan_account_entries: >-
+      {{ rhel_cac_scan_account_entries + [{'name': item.item,
+          'home': item.stdout.split(':')[5], 'shell': item.stdout.split(':')[6]}] }}
+    cacheable: false
+  loop: "{{ rhel_cac_scan_account_reads.results }}"

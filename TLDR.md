@@ -26,3 +26,13 @@ four fresh key/sudo logins. AAP end-to-end acceptance remains future work.
 
 Deployment commits are patch releases. Scanners follow completed deployment
 playbooks and are minor releases.
+
+
+`scan.yml` captures the same four bounded modules for explicitly selected local
+accounts. Supply unique new encrypted-output paths and the existing protected
+Vault password source in protected inventory. It preserves defaults/client
+private keys and refuses existing outputs or unsupported policy. Replay with
+`config_source=stored_config`. Add `--scan-output-directory` to the functional
+runner for scan → stored replay → captured/default verification. That complete
+0.1.0 workflow passed on both test guests, preserved defaults and finished four
+fresh key/sudo logins. AAP acceptance and snapshot restoration remain untested.
