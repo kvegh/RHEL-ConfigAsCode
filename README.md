@@ -6,7 +6,7 @@ work; RHEL 8 remains optional funded scope.
 
 ## Status and release order
 
-Working version: **0.1.0**. The first slice implements root hashes,
+Version: **0.1.0**. The first slice implements root hashes,
 declared local accounts/public keys, wheel sudo and SSH password authentication.
 All modules are optional, including for new running hosts. Selected modules still
 validate their fields and require supported targets and elevated Ansible access.
@@ -197,8 +197,8 @@ fields but does not independently interrogate the hypervisor.
 
 The default configuration must contain the two declared accounts and their
 generated private keys. Both targets use the same declared management account.
-The runner explicitly tests `default_config`; `stored_config` selection remains
-covered by local loader tests until its later scanner workflow is implemented.
+The basic workflow tests `default_config`. Add `--scan-output-directory` as
+described below to test scanning, `stored_config` replay and both state verifiers.
 Supply a known-hosts file from the explicitly authorized host-key enrollment.
 Enrollment records first-use trust; it does not imply independent hypervisor
 attestation of the keys. Every test SSH
